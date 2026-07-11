@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>땅땅 — 프로토타입 v2.1</title>
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --brand:#4059C8; --brand-press:#3348A8; --brand-tint:#EEF1FC;
+  --point:#0BA05C; --point-tint:#E8F7F0;
+  --ink:#191F28; --ink-2:#333D4B;
+  --sub:#6B7684; --sub-2:#8B95A1;
+  --line:#E5E8EB; --line-soft:#F2F4F6;
+  --bg:#FFFFFF; --surface:#F9FAFB; --warm:#FDFBF7;
+  --danger:#E5503C; --radius:14px;
+  font-size:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",Roboto,sans-serif;
+  background:#EDEFF2;color:var(--ink);
+  display:flex;align-items:center;justify-content:center;min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;border:none;background:none;cursor:pointer;color:inherit}
+button:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:8px}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+
+.phone{
+  width:390px;height:844px;background:var(--bg);border-radius:28px;overflow:hidden;position:relative;
+  box-shadow:0 24px 60px rgba(25,31,40,.18);display:flex;flex-direction:column;
+}
+@media (max-width:480px){
+  body{background:var(--bg)}
+  .phone{width:100%;height:100dvh;border-radius:0;box-shadow:none}
+}
+.statusbar{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;font-size:.8125rem;font-weight:600;color:var(--ink)}
+.statusbar .icons{display:flex;gap:5px;font-size:.75rem;color:var(--sub)}
+
+.screens{flex:1;position:relative;overflow:hidden}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;background:var(--bg)}
+.screen.active{display:flex}
+.scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+
+/* ============ HEADER ============ */
+.header{flex:none;padding:14px 20px 10px;display:flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:5}
+.header .loc{display:flex;align-items:center;gap:6px;font-size:1.1875rem;font-weight:700;letter-spacing:-.02em}
+.header .loc svg{width:14px;height:14px;color:var(--sub-2)}
+.header.sub{gap:4px;padding:12px 12px 10px}
+.header .back{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:12px}
+.header .back:active{background:var(--line-soft)}
+.header .title{font-size:1.0625rem;font-weight:700;letter-spacing:-.02em}
+
+/* ============ 홈 배너 ============ */
+.promise{margin:4px 20px 14px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--radius);
+  display:flex;align-items:center;gap:12px;background:var(--warm)}
+.promise b{font-size:.9063rem;font-weight:700;letter-spacing:-.02em;display:block;margin-bottom:2px}
+.promise span{font-size:.8125rem;color:var(--sub);letter-spacing:-.01em;line-height:1.45}
+.promise .mark{flex:none;width:38px;height:38px;border-radius:11px;background:var(--brand-tint);
+  display:flex;align-items:center;justify-content:center;color:var(--brand);font-weight:800;font-size:.8125rem}
+.section-label{padding:6px 20px 10px;font-size:.8125rem;font-weight:600;color:var(--sub-2);letter-spacing:-.01em}
+
+/* ============ 카드 ============ */
+.card{width:100%;text-align:left;display:flex;gap:14px;padding:14px 20px;align-items:center;transition:background .12s}
+.card:active{background:var(--surface)}
+.card + .card{border-top:1px solid var(--line-soft)}
+.thumb{flex:none;width:76px;height:76px;border-radius:12px;background:var(--surface);
+  border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:1.75rem}
+.card .info{flex:1;min-width:0}
+.card .name{font-size:.9688rem;font-weight:600;letter-spacing:-.015em;line-height:1.35;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .meta{margin-top:3px;font-size:.8125rem;color:var(--sub-2);letter-spacing:-.01em}
+.card .state{margin-top:7px;display:flex;gap:6px;align-items:center}
+.chip{font-size:.75rem;font-weight:600;padding:3px 8px;border-radius:6px;letter-spacing:-.01em}
+.chip.live{background:var(--brand-tint);color:var(--brand)}
+.chip.quiet{background:var(--line-soft);color:var(--sub)}
+.chip.green{background:var(--point-tint);color:var(--point)}
+.chip.gray{background:var(--line-soft);color:var(--sub-2)}
+.chip.red{background:#FDEEEC;color:var(--danger)}
+
+/* ============ 티켓 ============ */
+.ticket{flex:none;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-width:64px;padding:9px 12px 9px 16px;border-radius:10px;background:var(--brand);color:#fff}
+.ticket::before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:0;border-left:1.5px dashed rgba(255,255,255,.45)}
+.ticket::after,.ticket .notch{content:"";position:absolute;left:3.5px;width:8px;height:8px;border-radius:50%;background:var(--bg)}
+.ticket::after{top:-4px}
+.ticket .notch{bottom:-4px}
+.ticket .amt{font-size:.9375rem;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.ticket .lbl{font-size:.625rem;font-weight:600;opacity:.75;margin-top:1px;letter-spacing:.02em}
+.ticket.muted{background:#B0B8C1}
+
+/* ============ 상세 ============ */
+.hero-img{height:250px;background:var(--surface);display:flex;align-items:center;justify-content:center;
+  font-size:4.5rem;border-bottom:1px solid var(--line-soft)}
+.detail-body{padding:20px 20px 4px}
+.detail-body h1{font-size:1.375rem;font-weight:700;letter-spacing:-.025em;line-height:1.3}
+.detail-body .sub-meta{margin-top:6px;font-size:.8438rem;color:var(--sub-2)}
+.detail-body p.desc{margin-top:14px;font-size:.9375rem;line-height:1.65;color:var(--ink-2);letter-spacing:-.012em}
+
+/* 경매 현황 스트립 */
+.auction{margin:16px 20px 4px;border:1px solid var(--line);border-radius:var(--radius);
+  display:flex;background:var(--bg)}
+.auction div{flex:1;padding:13px 8px;text-align:center}
+.auction div + div{border-left:1px solid var(--line-soft)}
+.auction .k{font-size:.7188rem;color:var(--sub-2);font-weight:500;letter-spacing:-.005em}
+.auction .v{margin-top:4px;font-size:1.0313rem;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.auction .v.hi{color:var(--brand)}
+
+.assure{padding:16px 20px}
+.assure h2{font-size:.9375rem;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
+.assure .row{display:flex;gap:12px;padding:8px 0;align-items:flex-start}
+.assure .n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--line-soft);color:var(--sub);
+  font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.assure .row div b{display:block;font-size:.875rem;font-weight:600;letter-spacing:-.015em}
+.assure .row div span{font-size:.8125rem;color:var(--sub);letter-spacing:-.01em;line-height:1.5}
+
+/* ============ CTA ============ */
+.cta-bar{flex:none;padding:12px 20px calc(12px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line-soft);background:var(--bg);display:flex;gap:12px;align-items:center}
+.cta-price .amt{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cta-price .cap{font-size:.75rem;color:var(--sub-2)}
+.btn{flex:1;height:54px;border-radius:14px;background:var(--brand);color:#fff;
+  font-size:1.0313rem;font-weight:700;letter-spacing:-.02em;transition:transform .1s,background .12s}
+.btn:active{background:var(--brand-press);transform:scale(.985)}
+.btn:disabled{background:#D1D6DB;color:#fff;cursor:default;transform:none}
+.btn.green{background:var(--point)}
+.btn.green:active{background:#088A4F}
+
+/* ============ 지원서 작성 ============ */
+.form{padding:8px 20px 24px}
+.f-label{font-size:.8438rem;font-weight:600;color:var(--sub);letter-spacing:-.01em;margin:22px 0 9px}
+.f-label:first-child{margin-top:8px}
+.input{width:100%;border:1px solid var(--line);border-radius:12px;padding:14px 15px;
+  font-size:.9688rem;font-family:inherit;letter-spacing:-.015em;color:var(--ink);background:var(--bg)}
+.input::placeholder{color:#AEB5BD}
+.input:focus{outline:none;border-color:var(--brand)}
+.offer-box{border:1px solid var(--line);border-radius:var(--radius);padding:18px 16px;text-align:center}
+.offer-box .hint{font-size:.7813rem;color:var(--sub-2);letter-spacing:-.005em}
+.offer-ctrl{margin-top:10px;display:flex;align-items:center;justify-content:center;gap:18px}
+.offer-ctrl .step{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
+  font-size:1.375rem;font-weight:600;color:var(--ink-2);display:flex;align-items:center;justify-content:center}
+.offer-ctrl .step:active{background:var(--line-soft)}
+.offer-ctrl .step:disabled{color:#C8CDD3;border-color:var(--line-soft)}
+.offer-ctrl .num{min-width:130px;font-size:1.75rem;font-weight:800;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+.offer-box .base-note{margin-top:8px;font-size:.75rem;color:var(--sub-2)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chips button{padding:10px 14px;border:1px solid var(--line);border-radius:999px;
+  font-size:.8438rem;font-weight:500;color:var(--ink-2);letter-spacing:-.01em;transition:all .12s}
+.chips button.sel{border-color:var(--brand);background:var(--brand-tint);color:var(--brand);font-weight:600}
+.free-note{margin-top:22px;padding:13px 14px;background:var(--surface);border-radius:12px;
+  font-size:.8125rem;color:var(--sub);line-height:1.55;letter-spacing:-.008em}
+.free-note b{color:var(--ink-2);font-weight:600}
+
+/* ============ 등록 (시작가 3택) ============ */
+.seg{display:flex;gap:8px}
+.seg button{flex:1;height:76px;border:1.5px solid var(--line);border-radius:14px;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:all .12s}
+.seg button .p{font-size:1.0938rem;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.seg button .d{font-size:.7188rem;color:var(--sub-2);font-weight:500}
+.seg button.sel{border-color:var(--brand);background:var(--brand-tint)}
+.seg button.sel .p{color:var(--brand)}
+.seg button.sel .d{color:var(--brand);opacity:.75}
+.photo-add{width:84px;height:84px;border:1px dashed var(--line);border-radius:12px;
+  display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;
+  color:var(--sub-2);font-size:.75rem;font-weight:500}
+.photo-add svg{width:20px;height:20px}
+textarea.input{resize:none;height:100px;line-height:1.55}
+
+/* ============ 지원서 목록 (판매자) ============ */
+.app-card{margin:0 20px 12px;border:1px solid var(--line);border-radius:var(--radius);padding:16px;position:relative}
+.app-card.best{border-color:var(--brand)}
+.app-card .best-tag{position:absolute;top:-9px;left:14px;background:var(--brand);color:#fff;
+  font-size:.6875rem;font-weight:700;padding:2px 8px;border-radius:6px;letter-spacing:-.01em}
+.app-card .who{display:flex;align-items:center;gap:10px}
+.avatar{flex:none;width:38px;height:38px;border-radius:50%;background:var(--brand-tint);color:var(--brand);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9375rem}
+.app-card .who .nm{font-size:.9063rem;font-weight:600;letter-spacing:-.015em}
+.app-card .who .tr{font-size:.75rem;color:var(--sub-2);margin-top:1px}
+.app-card .who .tr b{color:var(--point);font-weight:700}
+.app-card .offer{margin-left:auto;text-align:right}
+.app-card .offer .o{font-size:1.1875rem;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.app-card .offer .plus{font-size:.6875rem;color:var(--brand);font-weight:700}
+.app-rows{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft)}
+.app-rows .r{display:flex;gap:8px;font-size:.8438rem;letter-spacing:-.01em;padding:3px 0}
+.app-rows .r span{flex:none;color:var(--sub-2);width:64px}
+.app-rows .r p{color:var(--ink-2);line-height:1.5}
+.app-actions{margin-top:13px;display:flex;gap:8px}
+.app-actions .accept{flex:1;height:44px;border-radius:11px;background:var(--brand);color:#fff;
+  font-size:.9063rem;font-weight:700;letter-spacing:-.015em}
+.app-actions .accept:active{background:var(--brand-press)}
+.app-card.dead{opacity:.5}
+.app-card.won{border-color:var(--point);background:var(--point-tint)}
+
+/* ============ 거래 탭 ============ */
+.tx{margin:0 20px 12px;border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.tx .top{display:flex;align-items:center;gap:10px}
+.tx .top .t-name{flex:1;font-size:.9375rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx .amount-row{margin-top:13px;padding-top:13px;border-top:1px solid var(--line-soft);
+  display:flex;justify-content:space-between;align-items:baseline}
+.tx .amount-row span{font-size:.8125rem;color:var(--sub)}
+.tx .amount-row b{font-size:1.0625rem;font-weight:800;font-variant-numeric:tabular-nums}
+.tx .amount-row b.green{color:var(--point)}
+.tx .hint{margin-top:9px;font-size:.7813rem;color:var(--sub-2);line-height:1.5}
+.tx .mini-btn{margin-top:12px;width:100%;height:44px;border-radius:11px;background:var(--brand-tint);
+  color:var(--brand);font-size:.875rem;font-weight:700;letter-spacing:-.015em}
+.tx .withdraw{margin-top:10px;font-size:.7813rem;color:var(--sub-2);text-decoration:underline}
+.empty{padding:60px 40px;text-align:center;color:var(--sub-2)}
+.empty .big{font-size:2.25rem;margin-bottom:12px}
+.empty p{font-size:.9063rem;letter-spacing:-.015em;line-height:1.5}
+
+/* ============ 탭바 ============ */
+.tabbar{flex:none;height:calc(62px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);
+  border-top:1px solid var(--line-soft);display:flex;background:var(--bg);z-index:5}
+.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-size:.6875rem;font-weight:600;color:var(--sub-2);letter-spacing:-.01em}
+.tabbar button svg{width:23px;height:23px}
+.tabbar button.on{color:var(--ink)}
+
+/* ============ 시트 ============ */
+.dim{position:absolute;inset:0;background:rgba(25,31,40,.5);opacity:0;pointer-events:none;transition:opacity .22s;z-index:20}
+.dim.show{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg);border-radius:22px 22px 0 0;
+  transform:translateY(105%);transition:transform .28s cubic-bezier(.32,.72,.25,1);z-index:21;
+  padding:10px 22px calc(22px + env(safe-area-inset-bottom))}
+.sheet.show{transform:translateY(0)}
+.sheet .grab{width:36px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 18px}
+.sheet h3{font-size:1.1875rem;font-weight:700;letter-spacing:-.025em;line-height:1.35}
+.sheet .sv{display:none}
+.sheet .sv.on{display:block}
+.pay-rows{margin:16px 0 4px}
+.pr{display:flex;justify-content:space-between;padding:9px 0;font-size:.9063rem;letter-spacing:-.015em}
+.pr span{color:var(--sub)}
+.pr b{font-weight:600;font-variant-numeric:tabular-nums}
+.pr.total{border-top:1px solid var(--line-soft);margin-top:6px;padding-top:14px}
+.pr.total span{color:var(--ink);font-weight:600}
+.pr.total b{font-size:1.125rem;font-weight:800;color:var(--brand)}
+.lock-note{margin:10px 0 16px;padding:13px 14px;background:var(--surface);border-radius:12px;
+  font-size:.8125rem;color:var(--sub);line-height:1.55;letter-spacing:-.008em}
+.lock-note b{color:var(--ink-2);font-weight:600}
+.sheet .btn{width:100%}
+.card-form .f-label{margin-top:16px}
+.done-ic{width:60px;height:60px;border-radius:50%;background:var(--point-tint);color:var(--point);
+  display:flex;align-items:center;justify-content:center;margin:10px auto 16px}
+.done-ic svg{width:28px;height:28px}
+.center{text-align:center}
+.center p{font-size:.9063rem;color:var(--sub);line-height:1.55;letter-spacing:-.015em;margin:8px 0 20px}
+.center p b{color:var(--ink);font-weight:600}
+
+/* ============ 낙찰 도장 ============ */
+.award-ticket{position:relative;width:230px;margin:18px auto 6px;padding:22px 20px 22px 30px;border-radius:16px;
+  background:var(--brand);color:#fff;text-align:left}
+.award-ticket::before{content:"";position:absolute;left:14px;top:12px;bottom:12px;border-left:2px dashed rgba(255,255,255,.4)}
+.award-ticket::after{content:"";position:absolute;left:8px;top:-6px;width:12px;height:12px;border-radius:50%;background:var(--bg)}
+.award-ticket .notch{position:absolute;left:8px;bottom:-6px;width:12px;height:12px;border-radius:50%;background:var(--bg)}
+.award-ticket .tk-lbl{font-size:.6875rem;font-weight:600;opacity:.75;letter-spacing:.06em}
+.award-ticket .tk-amt{font-size:1.75rem;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+.award-ticket .tk-to{font-size:.7813rem;opacity:.85;margin-top:6px}
+.stamp{position:absolute;right:-14px;top:-16px;width:76px;height:76px;border-radius:50%;
+  border:3.5px solid #FF6B4A;color:#FF6B4A;background:rgba(255,255,255,.92);
+  display:flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:900;letter-spacing:.05em;
+  transform:rotate(-14deg) scale(2.4);opacity:0}
+.stamp.hit{animation:stamp .85s cubic-bezier(.25,1.1,.35,1) .25s forwards}
+@keyframes stamp{                       /* 땅땅 — 두 번 두드림 */
+  0%{opacity:0;transform:rotate(-14deg) scale(2.4)}
+  28%{opacity:1;transform:rotate(-14deg) scale(.88)}   /* 첫 번째 땅 */
+  44%{transform:rotate(-11deg) scale(1.3)}
+  62%{transform:rotate(-15deg) scale(.9)}              /* 두 번째 땅 */
+  78%{transform:rotate(-13deg) scale(1.06)}
+  100%{opacity:1;transform:rotate(-13deg) scale(1)}
+}
+.award-ticket.knock{animation:knock .85s ease-out .25s}
+@keyframes knock{                       /* 봉 맞은 티켓의 울림 */
+  0%,20%,50%,100%{transform:translateY(0) rotate(0)}
+  28%{transform:translateY(3px) rotate(-.8deg)}
+  38%{transform:translateY(-1px) rotate(.3deg)}
+  62%{transform:translateY(3px) rotate(.8deg)}
+  74%{transform:translateY(-1px) rotate(-.3deg)}
+}
+
+.toast{position:absolute;left:20px;right:20px;bottom:88px;z-index:30;background:rgba(25,31,40,.92);color:#fff;
+  font-size:.875rem;font-weight:500;letter-spacing:-.015em;padding:14px 16px;border-radius:12px;
+  opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;text-align:center}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="statusbar"><span>9:41</span><div class="icons"><span>●●●</span><span>WiFi</span><span>100%</span></div></div>
+
+  <div class="screens">
+
+    <!-- ============ 홈 ============ -->
+    <div class="screen active" id="scr-home">
+      <div class="header">
+        <div class="loc">행당동
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="promise">
+          <div class="mark">땅땅</div>
+          <div>
+            <b>땅땅 치고 데려가세요</b>
+            <span>지원서는 공짜 · 결제는 낙찰 순간 · 노쇼는 자동 정산</span>
+          </div>
+        </div>
+        <div class="section-label">우리 동네 나눔</div>
+        <div id="feed"></div>
+        <div style="height:20px"></div>
+      </div>
+      <div class="tabbar">
+        <button class="on" data-tab="home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>홈
+        </button>
+        <button data-tab="post">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>나눔 올리기
+        </button>
+        <button data-tab="tx">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="15" rx="2.5"/><path d="M3 10h18"/></svg>거래
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ 상세 ============ -->
+    <div class="screen" id="scr-detail">
+      <div class="header sub">
+        <button class="back" data-nav="home" aria-label="뒤로가기">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+      </div>
+      <div class="scroll">
+        <div class="hero-img" id="d-emoji">🪑</div>
+        <div class="detail-body">
+          <h1 id="d-name"></h1>
+          <div class="sub-meta" id="d-meta"></div>
+        </div>
+        <div class="auction">
+          <div><div class="k">시작가</div><div class="v" id="d-start">1,000원</div></div>
+          <div><div class="k">현재 최고</div><div class="v hi" id="d-top">3,000원</div></div>
+          <div><div class="k">지원</div><div class="v" id="d-count">4명</div></div>
+        </div>
+        <div class="detail-body"><p class="desc" id="d-desc"></p></div>
+        <div class="assure">
+          <h2>이 거래가 안전한 이유</h2>
+          <div class="row"><div class="n">1</div>
+            <div><b>지원은 공짜예요</b><span>카드만 등록하고 지원해요. 지원 단계에서는 돈이 빠지지 않아요.</span></div></div>
+          <div class="row"><div class="n">2</div>
+            <div><b>낙찰되면 그 순간 자동 결제</b><span>판매자가 내 지원서를 수락하면 등록된 카드로 즉시 결제되고, 취소할 수 없어요.</span></div></div>
+          <div class="row"><div class="n">3</div>
+            <div><b>노쇼 시 자동 정산</b><span>약속 시간 내 수령하지 않으면 결제금 전액이 위약금으로 판매자에게 지급돼요.</span></div></div>
+        </div>
+        <div style="height:8px"></div>
+      </div>
+      <div class="cta-bar">
+        <div class="cta-price">
+          <div class="amt" id="d-cta-top">3,000원</div>
+          <div class="cap">현재 최고 제시가</div>
+        </div>
+        <button class="btn" id="d-cta">지원서 쓰기 (30초)</button>
+      </div>
+    </div>
+
+    <!-- ============ 지원서 작성 ============ -->
+    <div class="screen" id="scr-apply">
+      <div class="header sub">
+        <button class="back" data-nav="detail" aria-label="뒤로가기">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="title">지원서 쓰기</div>
+      </div>
+      <div class="scroll">
+        <div class="form">
+          <div class="f-label">제시 금액</div>
+          <div class="offer-box">
+            <div class="hint" id="a-hint">현재 최고 3,000원 · 시작가 그대로도 지원할 수 있어요</div>
+            <div class="offer-ctrl">
+              <button class="step" id="a-minus" aria-label="1,000원 내리기">−</button>
+              <div class="num" id="a-offer">1,000원</div>
+              <button class="step" id="a-plus" aria-label="1,000원 올리기">＋</button>
+            </div>
+            <div class="base-note" id="a-base">시작가 1,000원부터</div>
+          </div>
+          <div class="f-label">방문 가능 시간</div>
+          <div class="chips" id="a-times">
+            <button data-t="오늘 저녁">오늘 저녁</button>
+            <button data-t="내일 오전">내일 오전</button>
+            <button data-t="내일 저녁">내일 저녁</button>
+            <button data-t="주말 아무때나">주말 아무때나</button>
+          </div>
+          <div class="f-label">한 줄 메시지 (선택)</div>
+          <input class="input" id="a-msg" placeholder="예) 바로 앞 살아서 5분이면 가요">
+          <div class="free-note">
+            지원서 제출은 <b>무료</b>예요. 판매자가 수락하는 순간에만 제시 금액이 등록된 카드에서 결제되고, <b>낙찰 후에는 취소할 수 없어요.</b>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn" id="a-submit">지원서 내기</button>
+      </div>
+    </div>
+
+    <!-- ============ 등록 ============ -->
+    <div class="screen" id="scr-post">
+      <div class="header sub">
+        <button class="back" data-nav="home" aria-label="닫기">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <div class="title">나눔 올리기</div>
+      </div>
+      <div class="scroll">
+        <div class="form">
+          <div class="f-label">사진</div>
+          <button class="photo-add">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="14" rx="2.5"/><circle cx="12" cy="13" r="3.5"/><path d="M9 6l1.2-2h3.6L15 6"/></svg>0/5
+          </button>
+          <div class="f-label">물건 이름</div>
+          <input class="input" id="p-name" placeholder="예) 이케아 협탁, 거의 새 거">
+          <div class="f-label">시작가 — 지원자들이 이 가격 이상으로 제시해요</div>
+          <div class="seg" id="p-seg">
+            <button data-price="1000" class="sel"><span class="p">1,000원</span><span class="d">부담 없이 빨리</span></button>
+            <button data-price="3000"><span class="p">3,000원</span><span class="d">쓸 만한 물건</span></button>
+            <button data-price="5000"><span class="p">5,000원</span><span class="d">상태 좋은 물건</span></button>
+          </div>
+          <div class="f-label">설명</div>
+          <textarea class="input" placeholder="상태, 사용 기간, 수령 가능한 시간대를 적어주세요"></textarea>
+          <div class="free-note">
+            지원서가 오면 <b>제시 금액과 방문 시간, 메시지, 수령률</b>을 보고 마음에 드는 이웃을 고르세요. 수락하는 순간 결제까지 끝나고, 노쇼가 나면 결제금 전액이 위약금으로 들어와요.
+          </div>
+        </div>
+        <div style="height:12px"></div>
+      </div>
+      <div class="cta-bar">
+        <button class="btn" id="p-submit">이 시작가로 올리기</button>
+      </div>
+    </div>
+
+    <!-- ============ 거래 ============ -->
+    <div class="screen" id="scr-tx">
+      <div class="header"><div class="loc">거래</div></div>
+      <div class="scroll">
+        <div class="section-label" style="padding-top:10px">내 매물</div>
+        <div id="tx-mine"></div>
+        <div class="section-label" style="padding-top:14px">내 지원</div>
+        <div id="tx-apps"></div>
+        <div style="height:20px"></div>
+      </div>
+      <div class="tabbar">
+        <button data-tab="home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>홈
+        </button>
+        <button data-tab="post">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>나눔 올리기
+        </button>
+        <button class="on" data-tab="tx">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="15" rx="2.5"/><path d="M3 10h18"/></svg>거래
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ 지원서 목록 (판매자) ============ -->
+    <div class="screen" id="scr-applicants">
+      <div class="header sub">
+        <button class="back" data-nav="tx" aria-label="뒤로가기">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="title" id="ap-title">지원서 3건</div>
+      </div>
+      <div class="scroll">
+        <div class="section-label" style="padding-top:10px" id="ap-sub">접이식 캠핑 의자 2개 · 시작가 1,000원</div>
+        <div id="ap-list"></div>
+        <div style="height:20px"></div>
+      </div>
+    </div>
+
+  </div><!-- /screens -->
+
+  <!-- ============ 지원 시트 (카드등록 → 동의) ============ -->
+  <div class="dim" id="dim"></div>
+  <div class="sheet" id="sheet-apply">
+    <div class="grab"></div>
+
+    <div class="sv" id="sv-card">
+      <h3>결제 카드를 등록해주세요</h3>
+      <p style="margin-top:6px;font-size:.875rem;color:var(--sub);letter-spacing:-.015em;line-height:1.5">
+        처음 한 번만 등록하면 다음부턴 지원서만 쓰면 돼요.</p>
+      <div class="card-form">
+        <div class="f-label">카드번호</div>
+        <input class="input" value="5327 12•• •••• 4409" readonly>
+        <div class="f-label">유효기간 / CVC</div>
+        <div style="display:flex;gap:8px">
+          <input class="input" value="12 / 28" readonly style="flex:1">
+          <input class="input" value="•••" readonly style="flex:1">
+        </div>
+      </div>
+      <div class="lock-note" style="margin-top:16px">
+        지금은 카드 등록만 하고 <b>결제되지 않아요.</b> 낙찰 순간에만 제시 금액이 결제됩니다.
+      </div>
+      <button class="btn" id="s-card-ok">이 카드 등록하기</button>
+    </div>
+
+    <div class="sv" id="sv-consent">
+      <h3>이 조건으로 지원할게요</h3>
+      <div class="pay-rows">
+        <div class="pr"><span>제시 금액</span><b id="s-offer">2,000원</b></div>
+        <div class="pr"><span>방문 가능</span><b id="s-time">오늘 저녁</b></div>
+        <div class="pr total"><span>낙찰 시 결제금액</span><b id="s-total">2,000원</b></div>
+      </div>
+      <div class="lock-note">
+        판매자가 수락하면 <b>등록된 카드에서 즉시 결제</b>되며 <b>취소할 수 없어요.</b>
+        약속 시간 내 미수령 시 결제금 전액이 위약금으로 판매자에게 지급됩니다.
+      </div>
+      <button class="btn" id="s-apply-ok">동의하고 지원하기</button>
+    </div>
+
+    <div class="sv center" id="sv-applied">
+      <div class="done-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <h3>지원서를 냈어요</h3>
+      <p>판매자가 수락하면 <b>낙찰 알림과 함께 결제</b>가 진행돼요.<br>수락 전까지는 거래 탭에서 철회할 수 있어요.</p>
+      <button class="btn" id="s-applied-ok">확인</button>
+    </div>
+  </div>
+
+  <!-- ============ 수락 시트 (판매자) ============ -->
+  <div class="sheet" id="sheet-accept">
+    <div class="grab"></div>
+
+    <div class="sv" id="sv-accept">
+      <h3 id="ac-title">이 지원서를 수락할까요?</h3>
+      <div class="pay-rows">
+        <div class="pr"><span>낙찰자</span><b id="ac-nick">성수동감자</b></div>
+        <div class="pr"><span>방문 가능</span><b id="ac-time">오늘 저녁 7시 이후</b></div>
+        <div class="pr total"><span>받을 금액</span><b id="ac-amt">4,000원</b></div>
+      </div>
+      <div class="lock-note">
+        수락하는 순간 <b>낙찰자의 카드에서 즉시 결제</b>되고, 나머지 지원서에는
+        <b>자동으로 거절 알림</b>이 나가요. 이 결정은 되돌릴 수 없어요.
+      </div>
+      <button class="btn" id="ac-ok">땅땅 치고 낙찰 확정</button>
+    </div>
+
+    <div class="sv center" id="sv-award">
+      <div class="award-ticket">
+        <div class="tk-lbl">낙찰 티켓</div>
+        <div class="tk-amt" id="aw-amt">4,000원</div>
+        <div class="tk-to" id="aw-to">성수동감자 님 · 결제 완료</div>
+        <span class="notch"></span>
+        <div class="stamp" id="aw-stamp">땅땅</div>
+      </div>
+      <p style="margin-top:14px">결제가 완료됐어요. 낙찰자와 채팅으로<br>수령 시간을 확정해주세요.</p>
+      <button class="btn green" id="aw-ok">확인</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ============ 데이터 ============
+const items = [
+  {id:1, emoji:"🪑", name:"원목 사이드 테이블", loc:"행당동", time:"10분 전", start:1000, top:3000, apps:4,
+   desc:"이사 가면서 정리해요. 상판에 옅은 생활기스 있고 다리 흔들림 없습니다. 오늘 저녁 7시 이후 왕십리역 2번 출구에서 드려요."},
+  {id:2, emoji:"📚", name:"자료구조/알고리즘 전공서 4권 일괄", loc:"사근동", time:"32분 전", start:3000, top:3000, apps:1,
+   desc:"졸업하면서 정리합니다. 필기 조금 있지만 상태 깨끗해요. 4권 일괄로만 드립니다."},
+  {id:3, emoji:"🧸", name:"아기 장난감 모음 (소독 완료)", loc:"행당동", time:"1시간 전", start:1000, top:0, apps:0,
+   desc:"아이가 커서 안 가지고 놀아요. 전부 세척·소독해뒀습니다. 문고리 거래 가능해요."},
+  {id:4, emoji:"🍳", name:"3구 인덕션 프라이팬 세트", loc:"마장동", time:"2시간 전", start:5000, top:8000, apps:6,
+   desc:"6개월 사용, 코팅 손상 없습니다. 28cm 궁중팬 포함 3종. 주말 오전 수령 선호합니다."},
+];
+const myItem = {
+  emoji:"⛺", name:"접이식 캠핑 의자 2개", start:1000, status:"live",
+  applicants:[
+    {id:"a1", nick:"성수동감자", initial:"성", rate:100, trades:12, offer:4000, time:"오늘 저녁 7시 이후", msg:"바로 앞 살아요. 계단이면 제가 들고 내려갈게요.", st:"pending"},
+    {id:"a2", nick:"왕십리곰", initial:"왕", rate:96, trades:31, offer:3000, time:"내일 오전", msg:"차 있어서 어디든 갈 수 있어요.", st:"pending"},
+    {id:"a3", nick:"마장동새싹", initial:"마", rate:100, trades:2, offer:1000, time:"주말 아무때나", msg:"캠핑 입문했어요, 소중히 쓸게요 🙏", st:"pending"},
+  ]
+};
+let myApps = [];            // 내가 낸 지원서
+let hasCard = false;        // 빌링키 보유 여부
+let currentItem = null;
+let offer = 1000, pickedTime = null;
+let acceptTarget = null;
+
+// ============ 유틸 ============
+const $ = s => document.querySelector(s);
+const won = n => n.toLocaleString("ko-KR") + "원";
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2400);
+}
+function go(name){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  $("#scr-"+name).classList.add("active");
+}
+document.querySelectorAll("[data-tab]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.tab)));
+document.querySelectorAll("[data-nav]").forEach(b=>b.addEventListener("click",()=>go(b.dataset.nav)));
+
+// ============ 홈 피드 ============
+function renderFeed(){
+  $("#feed").innerHTML = items.map(it=>{
+    const shown = it.apps > 0 ? it.top : it.start;
+    return `
+    <button class="card" data-id="${it.id}">
+      <div class="thumb">${it.emoji}</div>
+      <div class="info">
+        <div class="name">${it.name}</div>
+        <div class="meta">${it.loc} · ${it.time} · 시작가 ${won(it.start)}</div>
+        <div class="state">
+          ${it.apps > 0
+            ? `<span class="chip live">지원 ${it.apps}명</span>`
+            : `<span class="chip quiet">아직 지원 없음 — 선점 기회</span>`}
+        </div>
+      </div>
+      <div class="ticket">
+        <span class="notch"></span>
+        <span class="amt">${shown.toLocaleString()}</span>
+        <span class="lbl">${it.apps > 0 ? "최고 제시" : "시작가"}</span>
+      </div>
+    </button>`;
+  }).join("");
+  document.querySelectorAll("#feed .card").forEach(c=>{
+    c.addEventListener("click", ()=>{
+      const it = items.find(x=>x.id === +c.dataset.id);
+      if(it) openDetail(it);
+    });
+  });
+}
+
+// ============ 상세 ============
+function openDetail(it){
+  currentItem = it;
+  $("#d-emoji").textContent = it.emoji;
+  $("#d-name").textContent = it.name;
+  $("#d-meta").textContent = `${it.loc} · ${it.time}`;
+  $("#d-desc").textContent = it.desc;
+  $("#d-start").textContent = won(it.start);
+  $("#d-top").textContent = it.apps>0 ? won(it.top) : "—";
+  $("#d-count").textContent = it.apps + "명";
+  $("#d-cta-top").textContent = it.apps>0 ? won(it.top) : won(it.start);
+  document.querySelector("#scr-detail .cta-price .cap").textContent = it.apps>0 ? "현재 최고 제시가" : "시작가";
+  const applied = myApps.some(a=>a.itemId===it.id && a.st==="pending");
+  const cta = $("#d-cta");
+  cta.disabled = applied;
+  cta.textContent = applied ? "지원 완료 — 판매자 검토 중" : "지원서 쓰기 (30초)";
+  go("detail");
+}
+$("#d-cta").addEventListener("click", ()=>{
+  offer = currentItem.start; pickedTime = null;
+  $("#a-offer").textContent = won(offer);
+  $("#a-base").textContent = `시작가 ${won(currentItem.start)}부터`;
+  $("#a-hint").textContent = currentItem.apps>0
+    ? `현재 최고 ${won(currentItem.top)} · 시작가 그대로도 지원할 수 있어요`
+    : "아직 지원자가 없어요 — 시작가 그대로도 충분해요";
+  $("#a-msg").value = "";
+  document.querySelectorAll("#a-times button").forEach(b=>b.classList.remove("sel"));
+  updateStepper();
+  go("apply");
+});
+
+// ============ 지원서 작성 ============
+function updateStepper(){
+  $("#a-offer").textContent = won(offer);
+  $("#a-minus").disabled = offer <= currentItem.start;
+}
+$("#a-plus").addEventListener("click", ()=>{ offer += 1000; updateStepper(); });
+$("#a-minus").addEventListener("click", ()=>{ offer = Math.max(currentItem.start, offer-1000); updateStepper(); });
+document.querySelectorAll("#a-times button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("#a-times button").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); pickedTime = b.dataset.t;
+  });
+});
+
+const dim = $("#dim");
+function showSheet(sheetId, viewId){
+  document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("show"));
+  const sh = $(sheetId);
+  sh.querySelectorAll(".sv").forEach(v=>v.classList.remove("on"));
+  sh.querySelector(viewId).classList.add("on");
+  dim.classList.add("show"); sh.classList.add("show");
+}
+function switchView(sheetId, viewId){
+  const sh = $(sheetId);
+  sh.querySelectorAll(".sv").forEach(v=>v.classList.remove("on"));
+  sh.querySelector(viewId).classList.add("on");
+}
+function closeSheets(){
+  dim.classList.remove("show");
+  document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("show"));
+}
+dim.addEventListener("click", closeSheets);
+
+$("#a-submit").addEventListener("click", ()=>{
+  if(!pickedTime){ toast("방문 가능 시간을 골라주세요"); return; }
+  $("#s-offer").textContent = won(offer);
+  $("#s-time").textContent = pickedTime;
+  $("#s-total").textContent = won(offer);
+  showSheet("#sheet-apply", hasCard ? "#sv-consent" : "#sv-card");
+});
+$("#s-card-ok").addEventListener("click", ()=>{
+  hasCard = true;
+  switchView("#sheet-apply", "#sv-consent");
+});
+$("#s-apply-ok").addEventListener("click", ()=>{
+  const btn = $("#s-apply-ok");
+  btn.disabled = true; btn.textContent = "제출 중…";
+  setTimeout(()=>{
+    btn.disabled = false; btn.textContent = "동의하고 지원하기";
+    // 상태 반영
+    currentItem.apps += 1;
+    currentItem.top = Math.max(currentItem.top, offer);
+    myApps.unshift({itemId:currentItem.id, name:currentItem.name, emoji:currentItem.emoji,
+      offer, time:pickedTime, st:"pending"});
+    renderFeed(); renderTx();
+    switchView("#sheet-apply", "#sv-applied");
+  }, 700);
+});
+$("#s-applied-ok").addEventListener("click", ()=>{
+  closeSheets();
+  setTimeout(()=>openDetail(currentItem), 240);
+});
+
+// ============ 등록 ============
+let postPrice = 1000;
+$("#p-seg").querySelectorAll("button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    $("#p-seg").querySelectorAll("button").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); postPrice = +b.dataset.price;
+  });
+});
+$("#p-submit").addEventListener("click", ()=>{
+  const name = $("#p-name").value.trim();
+  if(!name){ toast("물건 이름을 입력해주세요"); return; }
+  items.unshift({id:Date.now(), emoji:"📦", name, loc:"행당동", time:"방금 전",
+    start:postPrice, top:0, apps:0,
+    desc:"방금 등록된 나눔이에요. 지원서가 오면 알림으로 알려드려요."});
+  $("#p-name").value = "";
+  renderFeed(); go("home");
+  toast(`시작가 ${won(postPrice)}로 올렸어요 — 지원서가 오면 알려드릴게요`);
+});
+
+// ============ 거래 탭 ============
+function renderTx(){
+  // 내 매물
+  const mine = $("#tx-mine");
+  if(myItem.status === "live"){
+    const pend = myItem.applicants.filter(a=>a.st==="pending");
+    const top = pend.length ? Math.max(...pend.map(a=>a.offer)) : myItem.start;
+    mine.innerHTML = `
+      <div class="tx">
+        <div class="top">
+          <div class="thumb" style="width:44px;height:44px;font-size:1.25rem">${myItem.emoji}</div>
+          <div class="t-name">${myItem.name}</div>
+          <span class="chip live">지원 ${pend.length}건</span>
+        </div>
+        <div class="amount-row"><span>현재 최고 제시가</span><b>${won(top)}</b></div>
+        <button class="mini-btn" id="see-apps">지원서 보고 낙찰자 고르기</button>
+      </div>`;
+    $("#see-apps").addEventListener("click", ()=>{ renderApplicants(); go("applicants"); });
+  } else {
+    const winner = myItem.applicants.find(a=>a.st==="accepted");
+    mine.innerHTML = `
+      <div class="tx">
+        <div class="top">
+          <div class="thumb" style="width:44px;height:44px;font-size:1.25rem">${myItem.emoji}</div>
+          <div class="t-name">${myItem.name}</div>
+          <span class="chip green">낙찰 완료</span>
+        </div>
+        <div class="amount-row"><span>받을 금액 (${winner.nick})</span><b class="green">+${won(winner.offer)}</b></div>
+        <div class="hint">수령이 완료되면 정산돼요. 노쇼 시에는 전액이 위약금으로 자동 지급됩니다.</div>
+      </div>`;
+  }
+  // 내 지원
+  const box = $("#tx-apps");
+  if(!myApps.length){
+    box.innerHTML = `<div class="empty"><div class="big">🎫</div><p>아직 낸 지원서가 없어요.<br>홈에서 마음에 드는 나눔에 지원해보세요.</p></div>`;
+    return;
+  }
+  box.innerHTML = myApps.map((a,i)=>`
+    <div class="tx">
+      <div class="top">
+        <div class="thumb" style="width:44px;height:44px;font-size:1.25rem">${a.emoji}</div>
+        <div class="t-name">${a.name}</div>
+        ${a.st==="pending" ? `<span class="chip quiet">판매자 검토 중</span>`
+          : a.st==="withdrawn" ? `<span class="chip gray">철회함</span>`
+          : `<span class="chip green">낙찰</span>`}
+      </div>
+      <div class="amount-row"><span>내 제시가 · ${a.time}</span><b>${won(a.offer)}</b></div>
+      ${a.st==="pending" ? `<button class="withdraw" data-i="${i}">지원 철회하기</button>` : ""}
+    </div>`).join("");
+  box.querySelectorAll(".withdraw").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      const a = myApps[+b.dataset.i];
+      a.st = "withdrawn";
+      const it = items.find(x=>x.id===a.itemId);
+      if(it){ it.apps = Math.max(0, it.apps-1); }
+      renderFeed(); renderTx();
+      toast("지원을 철회했어요 — 잦은 철회는 신뢰지표에 반영돼요");
+    });
+  });
+}
+
+// ============ 지원서 목록 (판매자) ============
+function renderApplicants(){
+  const pend = myItem.applicants.filter(a=>a.st!=="withdrawn");
+  const maxOffer = Math.max(...pend.filter(a=>a.st==="pending"||a.st==="accepted").map(a=>a.offer));
+  $("#ap-title").textContent = `지원서 ${pend.length}건`;
+  $("#ap-sub").textContent = `${myItem.name} · 시작가 ${won(myItem.start)}`;
+  const sorted = [...pend].sort((x,y)=>y.offer-x.offer);
+  $("#ap-list").innerHTML = sorted.map(a=>{
+    const plus = a.offer - myItem.start;
+    const cls = a.st==="accepted" ? "won" : a.st==="rejected" ? "dead" : (a.offer===maxOffer && myItem.status==="live" ? "best" : "");
+    return `
+    <div class="app-card ${cls}">
+      ${cls==="best" ? `<div class="best-tag">최고 제시</div>` : ""}
+      <div class="who">
+        <div class="avatar">${a.initial}</div>
+        <div>
+          <div class="nm">${a.nick}</div>
+          <div class="tr">수령률 <b>${a.rate}%</b> · 거래 ${a.trades}회</div>
+        </div>
+        <div class="offer">
+          <div class="o">${won(a.offer)}</div>
+          ${plus>0 ? `<div class="plus">시작가 +${won(plus)}</div>` : `<div class="plus" style="color:var(--sub-2)">시작가 그대로</div>`}
+        </div>
+      </div>
+      <div class="app-rows">
+        <div class="r"><span>방문 가능</span><p>${a.time}</p></div>
+        <div class="r"><span>메시지</span><p>${a.msg}</p></div>
+      </div>
+      ${a.st==="pending" && myItem.status==="live"
+        ? `<div class="app-actions"><button class="accept" data-id="${a.id}">이 이웃에게 낙찰</button></div>`
+        : a.st==="accepted" ? `<div class="app-actions"><span class="chip green" style="margin-top:2px">낙찰 · 결제 완료</span></div>`
+        : a.st==="rejected" ? `<div class="app-actions"><span class="chip gray" style="margin-top:2px">거절 알림 발송됨</span></div>` : ""}
+    </div>`;
+  }).join("");
+  $("#ap-list").querySelectorAll(".accept").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      acceptTarget = myItem.applicants.find(a=>a.id===b.dataset.id);
+      $("#ac-nick").textContent = acceptTarget.nick;
+      $("#ac-time").textContent = acceptTarget.time;
+      $("#ac-amt").textContent = won(acceptTarget.offer);
+      showSheet("#sheet-accept", "#sv-accept");
+    });
+  });
+}
+
+$("#ac-ok").addEventListener("click", ()=>{
+  const btn = $("#ac-ok");
+  btn.disabled = true; btn.textContent = "낙찰자 카드에서 결제 중…";
+  setTimeout(()=>{
+    btn.disabled = false; btn.textContent = "땅땅 치고 낙찰 확정";
+    // 원자적 확정 시뮬레이션
+    acceptTarget.st = "accepted";
+    myItem.applicants.forEach(a=>{ if(a.st==="pending") a.st="rejected"; });
+    myItem.status = "awarded";
+    $("#aw-amt").textContent = won(acceptTarget.offer);
+    $("#aw-to").textContent = `${acceptTarget.nick} 님 · 결제 완료`;
+    const stamp = $("#aw-stamp"), tk = document.querySelector(".award-ticket");
+    stamp.classList.remove("hit"); tk.classList.remove("knock");
+    void stamp.offsetWidth;                                  // 애니메이션 리셋
+    switchView("#sheet-accept", "#sv-award");
+    stamp.classList.add("hit"); tk.classList.add("knock");
+    if(navigator.vibrate) navigator.vibrate([60, 120, 60]);  // 땅, 땅 (지원 기기 한정)
+    renderApplicants(); renderTx();
+  }, 1100);
+});
+$("#aw-ok").addEventListener("click", ()=>{
+  closeSheets();
+  setTimeout(()=>{ renderApplicants(); go("applicants"); }, 240);
+});
+
+// ============ 초기화 ============
+renderFeed();
+renderTx();
+</script>
+</body>
+</html>

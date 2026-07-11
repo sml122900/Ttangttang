@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* 디자인 토큰 — packages/tokens/src/index.ts 와 값을 동일하게 유지할 것 */
+@theme {
+  --color-brand: #4059c8;
+  --color-brand-press: #3348a8;
+  --color-brand-tint: #eef1fc;
+  --color-point: #0ba05c;
+  --color-point-tint: #e8f7f0;
+  --color-ink: #191f28;
+  --color-ink-2: #333d4b;
+  --color-sub: #6b7684;
+  --color-sub-2: #8b95a1;
+  --color-line: #e5e8eb;
+  --color-line-soft: #f2f4f6;
+  --color-surface-warm: #fdfbf7;
+  --color-surface-money: #ffffff;
+  --color-danger: #e5503c;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
+    "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background: var(--color-surface-warm);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
