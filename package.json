@@ -10,6 +10,7 @@
     "web:dev": "pnpm --filter @ttangttang/web dev",
     "web:build": "pnpm --filter @ttangttang/web build",
     "mobile:dev": "pnpm --filter @ttangttang/mobile start",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "e2e": "node --env-file=scripts/.env scripts/e2e-flow.mjs"
   }
 }
