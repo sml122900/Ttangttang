@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { AuctionStrip } from "@/components/AuctionStrip";
@@ -23,6 +23,7 @@ const SAFETY_STEPS = [
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const [item, setItem] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +105,10 @@ export default function ItemDetailScreen() {
             </View>
           </ScrollView>
 
-          <View className="flex-row items-center gap-3 border-t border-line-soft bg-white px-5 py-3">
+          <View
+            className="flex-row items-center gap-3 border-t border-line-soft bg-white px-5 pt-3"
+            style={{ paddingBottom: insets.bottom + 12 }}
+          >
             <View>
               <Text className="tabular-nums text-xl font-extrabold tracking-tight text-ink">
                 {won(item.applicantCount > 0 ? item.topOfferPrice ?? item.startPrice : item.startPrice)}

@@ -83,6 +83,9 @@ create table items (
   neighborhood text not null,
   status item_status not null default 'live',
   apply_deadline timestamptz,          -- 선택적 마감 (null = 무제한, 수락 시 즉시 종료)
+  pickup_slots text[] not null default '{}' check (cardinality(pickup_slots) between 1 and 4),
+                                        -- 판매자가 등록 시점에 입력하는 실제 방문 가능 시간(1~4개,
+                                        -- 자유 텍스트). 구매자는 지원서 작성 시 이 중 하나를 고른다.
   created_at timestamptz default now()
 );
 
@@ -94,7 +97,8 @@ create table applications (
   item_id uuid not null references items(id),
   applicant_id uuid not null references profiles(id),
   offer_price int not null,            -- 시작가 이상 (API에서 검증)
-  visit_time text not null,            -- "오늘 저녁 7시 이후" 등 자유 입력
+  visit_time text not null,            -- items.pickup_slots 중 구매자가 고른 값 그대로 저장
+                                        -- (자유 텍스트 컬럼이라 값의 출처만 바뀌었을 뿐 스키마는 그대로)
   message text,                        -- 한 줄 메시지 (선택)
   status app_status not null default 'pending',
   created_at timestamptz default now(),
@@ -244,10 +248,10 @@ export const START_PRICES = [1000, 3000, 5000] as const;
 app/
 ├── (tabs)/
 │   ├── index.tsx           # 홈 피드 — 최고 제시가 티켓, "지원 n명" 칩
-│   ├── post.tsx            # 등록 — 사진, 제목, 시작가 3택, 설명, 수령시한
+│   ├── post.tsx            # 등록 — 사진, 제목, 시작가 3택, 방문 가능 시간 슬롯(1~4개), 설명, 수령시한
 │   └── trades.tsx          # 거래 — 내 지원(진행/낙찰/탈락) + 내 매물(지원 현황) + 정산
 ├── item/[id].tsx           # 상세 — 최고가/지원자수, 신뢰 안내, CTA "지원서 쓰기 (30초)"
-├── item/[id]/apply.tsx     # 지원서 — 제시가, 방문 가능 시간, 한 줄 메시지
+├── item/[id]/apply.tsx     # 지원서 — 제시가, 매물의 pickup_slots 중 방문 가능 시간 선택, 한 줄 메시지
 │                           #   최초 1회: 카드 등록(빌링키) 웹뷰 선행
 ├── item/[id]/applicants.tsx# [판매자 전용] 지원서 목록 — 제시가·시간·메시지·수령률
 │                           #   "수락하기" → 돈 레지스터 확인 시트 → 자동결제 → 낙찰

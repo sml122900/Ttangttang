@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.sml122900.ttangttang",
       "adaptiveIcon": {
         "backgroundColor": "#EEF1FC",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -20,7 +21,6 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -39,6 +39,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a9c4948b-c6d3-4853-b223-b48c058dbe5b"
+      }
+    },
+    "owner": "sml122900"
   }
 }

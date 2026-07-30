@@ -8,6 +8,7 @@ interface ItemRow {
   start_price: number;
   neighborhood: string;
   status: string;
+  pickup_slots: string[];
   created_at: string;
 }
 
@@ -62,6 +63,7 @@ export interface ItemDetail {
   neighborhood: string;
   startPrice: number;
   status: string;
+  pickupSlots: string[];
   createdAt: string;
   applicantCount: number;
   topOfferPrice: number | null;
@@ -70,7 +72,7 @@ export interface ItemDetail {
 export async function fetchItemDetail(id: string): Promise<ItemDetail | null> {
   const { data: item, error: itemError } = await supabase
     .from("items")
-    .select("id,title,description,start_price,neighborhood,status,created_at")
+    .select("id,title,description,start_price,neighborhood,status,pickup_slots,created_at")
     .eq("id", id)
     .maybeSingle<ItemRow>();
   if (itemError) throw itemError;
@@ -90,6 +92,7 @@ export async function fetchItemDetail(id: string): Promise<ItemDetail | null> {
     neighborhood: item.neighborhood,
     startPrice: item.start_price,
     status: item.status,
+    pickupSlots: item.pickup_slots,
     createdAt: item.created_at,
     applicantCount: stat?.applicant_count ?? 0,
     topOfferPrice: stat?.top_offer_price ?? null,
@@ -104,7 +107,7 @@ export interface MyItemRow extends ItemRow {
 export async function fetchMyItems(sellerId: string): Promise<MyItemRow[]> {
   const { data: items, error } = await supabase
     .from("items")
-    .select("id,title,description,start_price,neighborhood,status,created_at")
+    .select("id,title,description,start_price,neighborhood,status,pickup_slots,created_at")
     .eq("seller_id", sellerId)
     .order("created_at", { ascending: false })
     .returns<ItemRow[]>();

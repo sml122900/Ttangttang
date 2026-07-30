@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { MoneySheet } from "@/components/MoneySheet";
@@ -10,13 +10,12 @@ import { useAuth } from "@/lib/auth";
 import { fetchItemDetail, type ItemDetail } from "@/lib/items";
 import { won } from "@/lib/format";
 
-const VISIT_TIMES = ["오늘 저녁", "내일 오전", "내일 저녁", "주말 아무때나"];
-
 type SheetStep = "closed" | "card" | "consent" | "applied";
 
 export default function ApplyScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
+  const insets = useSafeAreaInsets();
   const [item, setItem] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [offer, setOffer] = useState(1000);
@@ -160,7 +159,7 @@ export default function ApplyScreen() {
 
         <Text className="mb-2 mt-5 text-[13.5px] font-semibold text-sub">방문 가능 시간</Text>
         <View className="flex-row flex-wrap gap-2">
-          {VISIT_TIMES.map((t) => {
+          {item.pickupSlots.map((t) => {
             const selected = visitTime === t;
             return (
               <Pressable
@@ -196,7 +195,7 @@ export default function ApplyScreen() {
         </View>
       </ScrollView>
 
-      <View className="border-t border-line-soft bg-white px-5 py-3">
+      <View className="border-t border-line-soft bg-white px-5 pt-3" style={{ paddingBottom: insets.bottom + 12 }}>
         <Pressable
           onPress={handleSubmitPress}
           disabled={busy}

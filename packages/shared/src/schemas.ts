@@ -8,12 +8,14 @@ export const startPriceSchema = z.union([
 ]);
 
 // 등록 — §0 규칙 1: 시작가는 3택 고정, 그 외 값은 절대 허용하지 않는다.
+// pickupSlots: 판매자가 실제 가능한 방문 시간을 1~4개 자유 텍스트로 입력 (§2/§6).
 export const postItemInputSchema = z.object({
   title: z.string().trim().min(1).max(60),
   description: z.string().trim().min(1).max(1000),
   startPrice: startPriceSchema,
   photos: z.array(z.string().url()).max(5).default([]),
   neighborhood: z.string().trim().min(1).max(40),
+  pickupSlots: z.array(z.string().trim().min(1).max(40)).min(1).max(4),
   applyDeadline: z.string().datetime().nullable().optional(),
 });
 export type PostItemInput = z.infer<typeof postItemInputSchema>;

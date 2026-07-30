@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 20.5.1",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://bacwpzlenygqnowvcvnp.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_FciE-8jjr_1vjIZSfzRv7w_d4y2N0VO",
+        "EXPO_PUBLIC_WEB_ORIGIN": "https://atom-lived-appealing.ngrok-free.dev"
+      }
+    },
+    "preview": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://bacwpzlenygqnowvcvnp.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_FciE-8jjr_1vjIZSfzRv7w_d4y2N0VO",
+        "EXPO_PUBLIC_WEB_ORIGIN": "https://atom-lived-appealing.ngrok-free.dev"
+      }
+    }
+  }
+}

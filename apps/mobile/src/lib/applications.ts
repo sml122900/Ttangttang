@@ -155,6 +155,7 @@ export async function fetchApplicants(itemId: string): Promise<ApplicantRow[]> {
 export interface AcceptApplicationResult {
   ok: boolean;
   error?: string;
+  transactionId?: string;
 }
 
 // §3 [수락=낙찰] — apps/web 서버 전용 API가 accept_application → 토스 결제 → finalize/revert
@@ -171,9 +172,9 @@ export async function acceptApplication(
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const json = (await res.json().catch(() => ({}))) as { error?: string };
+  const json = (await res.json().catch(() => ({}))) as { error?: string; transaction?: { id: string } };
   if (!res.ok) {
     return { ok: false, error: json.error ?? "수락에 실패했어요" };
   }
-  return { ok: true };
+  return { ok: true, transactionId: json.transaction?.id };
 }

@@ -25,6 +25,7 @@ export interface Item {
   neighborhood: string;
   status: ItemStatus;
   applyDeadline: string | null;
+  pickupSlots: string[];   // 판매자가 등록 시점에 입력한 방문 가능 시간 (1~4개, 자유 텍스트)
   createdAt: string;
 }
 

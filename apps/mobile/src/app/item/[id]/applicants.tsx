@@ -25,6 +25,7 @@ export default function ApplicantsScreen() {
   const [target, setTarget] = useState<ApplicantRow | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [awarded, setAwarded] = useState<ApplicantRow | null>(null);
+  const [awardedTxId, setAwardedTxId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [itemData, applicantsData] = await Promise.all([fetchItemDetail(id), fetchApplicants(id)]);
@@ -71,6 +72,7 @@ export default function ApplicantsScreen() {
         return;
       }
       setAwarded(target);
+      setAwardedTxId(result.transactionId ?? null);
       setTarget(null);
       await load();
     } finally {
@@ -222,6 +224,7 @@ export default function ApplicantsScreen() {
         visible={!!awarded}
         onClose={() => {
           setAwarded(null);
+          setAwardedTxId(null);
           router.back();
         }}
       >
@@ -231,14 +234,28 @@ export default function ApplicantsScreen() {
             <Text className="mt-4 text-center text-[14.5px] leading-relaxed text-ink-2">
               결제가 완료됐어요. 낙찰자와 채팅으로{"\n"}수령 시간을 확정해주세요.
             </Text>
+            {awardedTxId && (
+              <Pressable
+                onPress={() => {
+                  const chatTxId = awardedTxId;
+                  setAwarded(null);
+                  setAwardedTxId(null);
+                  router.replace({ pathname: "/chat/[txId]", params: { txId: chatTxId } });
+                }}
+                className="mt-5 h-[54px] w-full items-center justify-center rounded-2xl bg-point active:bg-[#088A4F]"
+              >
+                <Text className="text-[16px] font-bold text-white">채팅하기</Text>
+              </Pressable>
+            )}
             <Pressable
               onPress={() => {
                 setAwarded(null);
+                setAwardedTxId(null);
                 router.back();
               }}
-              className="mt-5 h-[54px] w-full items-center justify-center rounded-2xl bg-point active:bg-[#088A4F]"
+              className="mt-2.5 h-11 w-full items-center justify-center rounded-2xl active:bg-line-soft"
             >
-              <Text className="text-[16px] font-bold text-white">확인</Text>
+              <Text className="text-[14px] font-semibold text-sub">나중에 할게요</Text>
             </Pressable>
           </View>
         )}

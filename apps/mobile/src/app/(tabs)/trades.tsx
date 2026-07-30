@@ -6,7 +6,11 @@ import { Chip } from "@/components/Chip";
 import { fetchMyApplications, withdrawApplication, type MyApplicationRow } from "@/lib/applications";
 import { useAuth } from "@/lib/auth";
 import { fetchMyItems, type MyItemRow } from "@/lib/items";
-import { fetchMySaleTransactions, type MySaleTransaction } from "@/lib/transactions";
+import {
+  fetchMyPurchaseTransactionsByApplicationId,
+  fetchMySaleTransactions,
+  type MySaleTransaction,
+} from "@/lib/transactions";
 import { won } from "@/lib/format";
 
 const APP_STATUS_CHIP: Record<string, { label: string; tone: "quiet" | "gray" | "green" | "red" }> = {
@@ -22,19 +26,22 @@ export default function TradesScreen() {
   const [myItems, setMyItems] = useState<MyItemRow[]>([]);
   const [myApps, setMyApps] = useState<MyApplicationRow[]>([]);
   const [saleTx, setSaleTx] = useState<MySaleTransaction[]>([]);
+  const [purchaseTxByAppId, setPurchaseTxByAppId] = useState<Map<string, string>>(new Map());
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!session) return;
-    const [items, apps, tx] = await Promise.all([
+    const [items, apps, tx, purchaseTx] = await Promise.all([
       fetchMyItems(session.user.id),
       fetchMyApplications(session.user.id),
       fetchMySaleTransactions(session.user.id),
+      fetchMyPurchaseTransactionsByApplicationId(session.user.id),
     ]);
     setMyItems(items);
     setMyApps(apps);
     setSaleTx(tx);
+    setPurchaseTxByAppId(purchaseTx);
   }, [session]);
 
   useEffect(() => {
@@ -142,6 +149,12 @@ export default function TradesScreen() {
                     <Text className="mt-2 text-xs leading-relaxed text-sub-2">
                       수령이 완료되면 정산돼요. 노쇼 시에는 전액이 위약금으로 자동 지급됩니다.
                     </Text>
+                    <Pressable
+                      onPress={() => router.push({ pathname: "/chat/[txId]", params: { txId: tx.id } })}
+                      className="mt-3 h-11 items-center justify-center rounded-xl bg-brand-tint active:opacity-80"
+                    >
+                      <Text className="text-[13.5px] font-bold text-brand">채팅하기</Text>
+                    </Pressable>
                   </>
                 ) : null}
               </View>
@@ -160,6 +173,7 @@ export default function TradesScreen() {
         ) : (
           myApps.map((a) => {
             const chip = APP_STATUS_CHIP[a.status];
+            const chatTxId = a.status === "accepted" ? purchaseTxByAppId.get(a.id) : undefined;
             return (
               <View key={a.id} className="mx-5 mb-3 rounded-card border border-line bg-white px-4 py-4">
                 <View className="flex-row items-center gap-2.5">
@@ -177,6 +191,14 @@ export default function TradesScreen() {
                     <Text className="mt-2.5 text-xs text-sub-2 underline">
                       {withdrawingId === a.id ? "철회하는 중…" : "지원 철회하기"}
                     </Text>
+                  </Pressable>
+                )}
+                {chatTxId && (
+                  <Pressable
+                    onPress={() => router.push({ pathname: "/chat/[txId]", params: { txId: chatTxId } })}
+                    className="mt-3 h-11 items-center justify-center rounded-xl bg-brand-tint active:opacity-80"
+                  >
+                    <Text className="text-[13.5px] font-bold text-brand">채팅하기</Text>
                   </Pressable>
                 )}
               </View>
