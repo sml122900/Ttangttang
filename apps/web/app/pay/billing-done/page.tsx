@@ -1,39 +1,25 @@
-"use client";
+import { appScheme, getBillingSession } from "@/lib/billing-session";
+import { DeepLinkRedirect } from "./DeepLinkRedirect";
 
-import { Suspense, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+type Props = { searchParams: Promise<{ ok?: string; reason?: string; session?: string }> };
 
 // §5 돈 레지스터: 카드 등록 결과 화면. 위트 금지, 결과를 건조하게 알리고 앱으로 돌려보낸다.
-// expo-web-browser의 openAuthSessionAsync가 이 커스텀 스킴 이동을 감지해 인앱 브라우저를 닫는다
-// (Kakao 로그인 콜백과 동일한 패턴, apps/mobile/src/lib/auth.tsx 참고).
-function BillingDoneInner() {
-  const searchParams = useSearchParams();
-  const ok = searchParams.get("ok") === "1";
-  const reason = searchParams.get("reason");
-  const clientRedirect = searchParams.get("clientRedirect");
-  // Expo Go는 세션마다 다른 exp://<LAN-IP>:<port> 딥링크를 쓰므로, 모바일이 넘긴 clientRedirect가
-  // 있으면 그걸 그대로 쓰고, 없을 때만(직접 브라우저로 열어본 경우 등) 고정 스킴으로 폴백한다.
-  const scheme = process.env.NEXT_PUBLIC_APP_SCHEME ?? "ttangttang";
-  const base = clientRedirect ?? `${scheme}://`;
+// expo-web-browser의 openAuthSessionAsync가 이 딥링크 이동을 감지해 인앱 브라우저를 닫는다.
+// 돌아갈 딥링크는 세션에 저장된(발급 시 허용 스킴 검증을 통과한) 값만 쓴다 — 쿼리로 받은
+// 임의 URL로는 절대 보내지 않는다 (§4 P5 오픈 리다이렉트 차단).
+export default async function BillingDonePage({ searchParams }: Props) {
+  const { ok: okParam, reason, session: sessionId } = await searchParams;
+  const ok = okParam === "1";
+  const session = await getBillingSession(sessionId);
+  const base = session?.client_redirect ?? `${appScheme()}://`;
   const deepLink = `${base}${base.includes("?") ? "&" : "?"}ok=${ok ? "1" : "0"}`;
-
-  useEffect(() => {
-    // 일부 모바일 브라우저는 사용자 제스처 없는 커스텀 스킴 이동을 막는다 —
-    // 자동 시도 + 아래 버튼(수동 폴백)을 함께 둔다.
-    window.location.href = deepLink;
-  }, [deepLink]);
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-white px-6 text-center">
-      <h1 className="text-lg font-bold tracking-tight text-ink">
-        {ok ? "카드 등록 완료" : "카드 등록 실패"}
-      </h1>
+      <DeepLinkRedirect href={deepLink} />
+      <h1 className="text-lg font-bold tracking-tight text-ink">{ok ? "카드 등록 완료" : "카드 등록 실패"}</h1>
       <p className="text-sm leading-relaxed text-sub">
-        {ok
-          ? "등록된 카드는 낙찰되는 순간에만 결제돼요."
-          : reason
-            ? `다시 시도해주세요. (${decodeURIComponent(reason)})`
-            : "다시 시도해주세요."}
+        {ok ? "등록된 카드는 낙찰되는 순간에만 결제돼요." : reason ? `다시 시도해주세요. (${reason})` : "다시 시도해주세요."}
       </p>
       <a
         href={deepLink}
@@ -42,13 +28,5 @@ function BillingDoneInner() {
         앱으로 돌아가기
       </a>
     </main>
-  );
-}
-
-export default function BillingDonePage() {
-  return (
-    <Suspense>
-      <BillingDoneInner />
-    </Suspense>
   );
 }

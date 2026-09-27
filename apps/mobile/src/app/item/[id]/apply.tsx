@@ -84,7 +84,7 @@ export default function ApplyScreen() {
   async function handleCardRegisterPress() {
     setBusy(true);
     try {
-      const result = await openCardRegistration(session!.user.id);
+      const result = await openCardRegistration(session!.access_token);
       if (!result.ok) {
         Alert.alert("카드 등록이 완료되지 않았어요", "다시 시도해주세요.");
         return;

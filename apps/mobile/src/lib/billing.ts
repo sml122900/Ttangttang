@@ -11,18 +11,26 @@ export interface CardRegistrationResult {
 
 // 토스 카드등록창을 열고, apps/web(/pay/billing-auth → 토스 호스팅 화면 →
 // /api/billing/callback → /pay/billing-done)을 거쳐 돌아올 때까지 기다린다.
-// 빌링키 원문은 절대 이 클라이언트에 오지 않는다 — apps/web이 service role로 billing_keys에
-// 저장할 뿐이고, 여기서는 성공/실패 여부만 안다 (실제 등록 여부 확인은 has_billing_key() RPC로).
-export async function openCardRegistration(customerKey: string): Promise<CardRegistrationResult> {
+// 먼저 access token으로 1회용 세션을 발급받는다 — 서버가 토큰 주인을 카드 등록 대상으로 고정하므로
+// 다른 사람 명의로 카드를 등록할 수 없다 (§4 P5).
+// 빌링키 원문은 절대 이 클라이언트에 오지 않는다 — 여기서는 성공/실패 여부만 안다
+// (실제 등록 여부 확인은 has_billing_key() RPC로).
+export async function openCardRegistration(accessToken: string): Promise<CardRegistrationResult> {
   const webOrigin = process.env.EXPO_PUBLIC_WEB_ORIGIN;
   if (!webOrigin) {
     throw new Error("EXPO_PUBLIC_WEB_ORIGIN is not set (.env, see .env.example)");
   }
-  const url = `${webOrigin}/pay/billing-auth?customerKey=${encodeURIComponent(
-    customerKey,
-  )}&clientRedirect=${encodeURIComponent(redirectTo)}`;
+  const res = await fetch(`${webOrigin}/api/billing/session`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ clientRedirect: redirectTo }),
+  });
+  const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (!res.ok || !json.url) {
+    throw new Error(json.error ?? "카드 등록을 시작하지 못했어요");
+  }
 
-  const result = await WebBrowser.openAuthSessionAsync(url, redirectTo);
+  const result = await WebBrowser.openAuthSessionAsync(json.url, redirectTo);
   if (result.type !== "success") {
     return { ok: false };
   }
