@@ -11,6 +11,7 @@
     "web:build": "pnpm --filter @ttangttang/web build",
     "mobile:dev": "pnpm --filter @ttangttang/mobile start",
     "typecheck": "pnpm -r run typecheck",
-    "e2e": "node --env-file=scripts/.env scripts/e2e-flow.mjs"
+    "e2e": "node --env-file=scripts/.env scripts/e2e-flow.mjs",
+    "verify:stage3": "node --env-file=scripts/.env scripts/verify-stage3.mjs"
   }
 }
