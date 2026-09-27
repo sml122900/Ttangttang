@@ -40,6 +40,18 @@
         {
           "locationWhenInUsePermissionText": "동네를 자동으로 설정하려면 위치 권한이 필요해요. 언제든 직접 검색으로 바꿀 수 있어요."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "매물 사진을 올리려면 사진 보관함 접근 권한이 필요해요."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#4059C8"
+        }
       ]
     ],
     "experiments": {
