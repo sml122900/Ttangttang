@@ -13,7 +13,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://bacwpzlenygqnowvcvnp.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_FciE-8jjr_1vjIZSfzRv7w_d4y2N0VO",
-        "EXPO_PUBLIC_WEB_ORIGIN": "https://atom-lived-appealing.ngrok-free.dev"
+        "EXPO_PUBLIC_WEB_ORIGIN": "<TODO: Vercel 배포 URL로 교체 — docs/decisions/environment-separation.md>"
       }
     },
     "preview": {
@@ -25,7 +25,20 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://bacwpzlenygqnowvcvnp.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_FciE-8jjr_1vjIZSfzRv7w_d4y2N0VO",
-        "EXPO_PUBLIC_WEB_ORIGIN": "https://atom-lived-appealing.ngrok-free.dev"
+        "EXPO_PUBLIC_WEB_ORIGIN": "<TODO: Vercel 배포 URL로 교체 — docs/decisions/environment-separation.md>"
+      }
+    },
+    "production": {
+      "developmentClient": false,
+      "distribution": "store",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "<TODO: 프로덕션 Supabase 프로젝트 생성 후 채울 것 — docs/decisions/environment-separation.md>",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "<TODO: 프로덕션 Supabase publishable key>",
+        "EXPO_PUBLIC_WEB_ORIGIN": "<TODO: 프로덕션 Vercel 도메인>"
       }
     }
   }

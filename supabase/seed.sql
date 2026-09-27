@@ -1,4 +1,8 @@
 -- 로컬 개발용 데모 데이터. `supabase start`/`supabase db reset` 때 자동 적용된다.
+--
+-- ⚠️ 프로덕션 프로젝트에는 절대 적용하지 말 것 (docs/decisions/environment-separation.md).
+-- `supabase db push --linked`는 이 파일을 건드리지 않아 안전하지만, `supabase db reset --linked`는
+-- 스키마를 지우고 마이그레이션+이 파일을 처음부터 재실행한다 — prod ref에 실행 금지.
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'seed-seller@ttangttang.local'),
   ('22222222-2222-2222-2222-222222222222', 'seed-applicant1@ttangttang.local'),
