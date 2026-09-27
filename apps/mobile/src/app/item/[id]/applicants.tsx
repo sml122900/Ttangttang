@@ -75,6 +75,14 @@ export default function ApplicantsScreen() {
       setAwardedTxId(result.transactionId ?? null);
       setTarget(null);
       await load();
+    } catch (err) {
+      // 네트워크 오류 — 서버에서는 처리됐을 수도 있으니 목록을 다시 불러와 실제 상태를 보여준다 (§4 P7).
+      Alert.alert(
+        "수락 결과를 확인하지 못했어요",
+        "네트워크 상태를 확인해주세요. 목록을 새로 불러올게요.",
+      );
+      setTarget(null);
+      await load().catch(() => {});
     } finally {
       setAccepting(false);
     }
