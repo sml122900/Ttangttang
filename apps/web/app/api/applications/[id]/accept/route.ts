@@ -16,6 +16,7 @@ interface ApplicationRow {
 interface ItemRow {
   id: string;
   title: string;
+  pickup_deadline_hours: number;
 }
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const { data: item } = await admin
     .from("items")
-    .select("id,title")
+    .select("id,title,pickup_deadline_hours")
     .eq("id", acceptedApp.item_id)
     .maybeSingle<ItemRow>();
 
@@ -150,8 +151,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // ---------- 3) 결제 성공 → 낙찰 확정 ----------
-  // pickup_deadline: 등록 화면에 아직 "수령시한" 입력이 없어(§6 백로그) 24시간 고정값을 쓴다.
-  const pickupDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  // pickup_deadline: 판매자가 등록 화면에서 고른 수령시한(items.pickup_deadline_hours, 4단계).
+  // item 조회가 어떤 이유로든 비면(이론상 거의 없음) 24시간으로 안전하게 폴백한다.
+  const pickupHours = item?.pickup_deadline_hours ?? 24;
+  const pickupDeadline = new Date(Date.now() + pickupHours * 60 * 60 * 1000).toISOString();
 
   const { data: tx, error: finalizeError } = await admin
     .rpc("finalize_accepted_application", {

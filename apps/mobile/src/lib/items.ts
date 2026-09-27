@@ -14,6 +14,8 @@ interface ItemRow {
 
 interface ItemDetailRow extends ItemRow {
   seller_id: string;
+  pickup_deadline_hours: number;
+  photos: string[];
 }
 
 interface StatsRow {
@@ -72,12 +74,14 @@ export interface ItemDetail {
   applicantCount: number;
   topOfferPrice: number | null;
   sellerId: string;
+  pickupDeadlineHours: number;
+  photos: string[];
 }
 
 export async function fetchItemDetail(id: string): Promise<ItemDetail | null> {
   const { data: item, error: itemError } = await supabase
     .from("items")
-    .select("id,title,description,start_price,neighborhood,status,pickup_slots,created_at,seller_id")
+    .select("id,title,description,start_price,neighborhood,status,pickup_slots,created_at,seller_id,pickup_deadline_hours,photos")
     .eq("id", id)
     .maybeSingle<ItemDetailRow>();
   if (itemError) throw itemError;
@@ -102,7 +106,41 @@ export async function fetchItemDetail(id: string): Promise<ItemDetail | null> {
     applicantCount: stat?.applicant_count ?? 0,
     topOfferPrice: stat?.top_offer_price ?? null,
     sellerId: item.seller_id,
+    pickupDeadlineHours: item.pickup_deadline_hours,
+    photos: item.photos,
   };
+}
+
+export interface UpdateItemParams {
+  title: string;
+  description: string;
+  pickupSlots: string[];
+  pickupDeadlineHours: number;
+  photos: string[];
+}
+
+// items_update_own_live_or_cancel RLS(§2)가 "내 live 매물만, live/cancelled로만 전이" 허용 —
+// start_price는 안 건드리므로 status는 그대로 live로 유지된다(items_start_price_immutable
+// 트리거가 실수로라도 바뀌면 막아준다, 4단계).
+export async function updateItem(itemId: string, params: UpdateItemParams): Promise<void> {
+  const { error } = await supabase
+    .from("items")
+    .update({
+      title: params.title,
+      description: params.description,
+      pickup_slots: params.pickupSlots,
+      pickup_deadline_hours: params.pickupDeadlineHours,
+      photos: params.photos,
+    })
+    .eq("id", itemId);
+  if (error) throw error;
+}
+
+// "삭제" = 취소(cancelled). items_reject_applications_on_cancel 트리거(4단계)가 대기 중이던
+// 지원서를 자동으로 거절 처리한다.
+export async function cancelItem(itemId: string): Promise<void> {
+  const { error } = await supabase.from("items").update({ status: "cancelled" }).eq("id", itemId);
+  if (error) throw error;
 }
 
 export interface MyItemRow extends ItemRow {
