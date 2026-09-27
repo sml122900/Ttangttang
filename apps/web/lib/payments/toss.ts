@@ -1,6 +1,22 @@
-import type { BillingKeyResult, ChargeResult, PaymentGateway } from "./types";
+import type {
+  BillingKeyResult,
+  CancelResult,
+  ChargeResult,
+  PaymentGateway,
+  PaymentLookup,
+} from "./types";
 
-const TOSS_API_BASE = "https://api.tosspayments.com/v1";
+// TOSS_API_BASE는 e2e에서 모의 토스 서버를 가리키게 할 때만 바꾼다 (scripts/e2e-flow.mjs).
+function apiBase(): string {
+  return process.env.TOSS_API_BASE ?? "https://api.tosspayments.com/v1";
+}
+
+// 토스 응답이 늦으면 서버리스 함수 전체가 묶인다 — 결과를 모르는 상태(unknown)로 끊고
+// orderId 조회로 대조하는 편이 낫다 (§4 P2, P10).
+function timeoutMs(): number {
+  const n = Number(process.env.TOSS_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 10_000;
+}
 
 function authHeader(): string {
   const secretKey = process.env.TOSS_SECRET_KEY;
@@ -12,48 +28,94 @@ function authHeader(): string {
   return `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
 }
 
-async function tossFetch(path: string, body: Record<string, unknown>) {
-  const res = await fetch(`${TOSS_API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: authHeader(),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+// 네트워크 예외·타임아웃·JSON이 아닌 응답은 전부 throw한다 — 호출부가 "결과 모름"으로 분류한다.
+async function tossFetch(
+  path: string,
+  init: { method: "GET" | "POST"; body?: Record<string, unknown>; idempotencyKey?: string },
+) {
+  const headers: Record<string, string> = { Authorization: authHeader() };
+  if (init.body) headers["Content-Type"] = "application/json";
+  // 같은 키로 재요청하면 토스가 첫 응답을 그대로 돌려준다 — 이중 결제·이중 취소 방지 (§4 P4).
+  if (init.idempotencyKey) headers["Idempotency-Key"] = init.idempotencyKey;
+
+  const res = await fetch(`${apiBase()}${path}`, {
+    method: init.method,
+    headers,
+    body: init.body ? JSON.stringify(init.body) : undefined,
+    signal: AbortSignal.timeout(timeoutMs()),
   });
   const json = (await res.json()) as Record<string, unknown>;
   return { ok: res.ok, status: res.status, json };
 }
 
+function str(v: unknown, fallback: string): string {
+  return typeof v === "string" ? v : fallback;
+}
+
 export const tossGateway: PaymentGateway = {
   async issueBillingKey({ authKey, customerKey }): Promise<BillingKeyResult> {
     const { ok, json } = await tossFetch("/billing/authorizations/issue", {
-      authKey,
-      customerKey,
+      method: "POST",
+      body: { authKey, customerKey },
     });
     if (!ok || typeof json.billingKey !== "string") {
-      const message = typeof json.message === "string" ? json.message : "빌링키 발급에 실패했어요";
-      throw new Error(message);
+      throw new Error(str(json.message, "빌링키 발급에 실패했어요"));
     }
     return { billingKey: json.billingKey };
   },
 
   async chargeBilling({ billingKey, customerKey, amount, orderId, orderName }): Promise<ChargeResult> {
-    const { ok, json } = await tossFetch(`/billing/${encodeURIComponent(billingKey)}`, {
-      customerKey,
-      amount,
-      orderId,
-      orderName,
+    let res;
+    try {
+      res = await tossFetch(`/billing/${encodeURIComponent(billingKey)}`, {
+        method: "POST",
+        body: { customerKey, amount, orderId, orderName },
+        idempotencyKey: `charge-${orderId}`,
+      });
+    } catch (err) {
+      return { status: "unknown", message: err instanceof Error ? err.message : String(err) };
+    }
+    // 5xx는 토스 내부 처리 도중 실패일 수 있어 "거절"로 단정하지 않는다.
+    if (res.status >= 500) {
+      return { status: "unknown", message: str(res.json.message, `HTTP ${res.status}`) };
+    }
+    if (!res.ok) {
+      return {
+        status: "declined",
+        code: str(res.json.code, "UNKNOWN_ERROR"),
+        message: str(res.json.message, "결제에 실패했어요"),
+      };
+    }
+    if (typeof res.json.paymentKey !== "string") {
+      return { status: "unknown", message: "결제 응답에 paymentKey가 없어요" };
+    }
+    return { status: "paid", paymentKey: res.json.paymentKey };
+  },
+
+  async findPaymentByOrderId(orderId): Promise<PaymentLookup> {
+    const { ok, status, json } = await tossFetch(`/payments/orders/${encodeURIComponent(orderId)}`, {
+      method: "GET",
     });
-    if (!ok) {
-      const code = typeof json.code === "string" ? json.code : "UNKNOWN_ERROR";
-      const message = typeof json.message === "string" ? json.message : "결제에 실패했어요";
-      return { ok: false, code, message };
+    if (status === 404) return { found: false };
+    if (!ok || typeof json.paymentKey !== "string") {
+      throw new Error(`결제 조회 실패: ${str(json.message, `HTTP ${status}`)}`);
     }
-    const paymentKey = json.paymentKey;
-    if (typeof paymentKey !== "string") {
-      return { ok: false, code: "MALFORMED_RESPONSE", message: "결제 응답에 paymentKey가 없어요" };
+    return { found: true, paymentKey: json.paymentKey, status: str(json.status, "UNKNOWN") };
+  },
+
+  async cancelPayment({ paymentKey, reason }): Promise<CancelResult> {
+    try {
+      const { ok, json } = await tossFetch(`/payments/${encodeURIComponent(paymentKey)}/cancel`, {
+        method: "POST",
+        body: { cancelReason: reason },
+        idempotencyKey: `cancel-${paymentKey}`,
+      });
+      if (!ok) {
+        return { ok: false, code: str(json.code, "UNKNOWN_ERROR"), message: str(json.message, "결제 취소 실패") };
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, code: "NETWORK_ERROR", message: err instanceof Error ? err.message : String(err) };
     }
-    return { ok: true, paymentKey };
   },
 };
