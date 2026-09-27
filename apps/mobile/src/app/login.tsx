@@ -1,26 +1,28 @@
 import { useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useAuth } from "@/lib/auth";
+import { openLegalPage } from "@/lib/legal";
+import { needsOnboarding } from "@/lib/profile";
+import { supabase } from "@/lib/supabase";
 
-// §3 결제 리스크 — 지원서 제출 화면이 아니라 로그인 시점에 약관·처리방침을 먼저 보여준다.
-// 앱에 아직 설정 화면이 없어(§6 백로그, settings/payment 등) 지금은 로그인 화면이 유일한
-// 진입점이다. apps/web에 배포된 페이지를 그대로 연다 — 모바일에 내용을 중복 유지하지 않는다.
-function openLegalPage(path: "/terms" | "/privacy") {
-  const webOrigin = process.env.EXPO_PUBLIC_WEB_ORIGIN;
-  if (!webOrigin) {
-    Alert.alert("페이지를 열 수 없어요", "EXPO_PUBLIC_WEB_ORIGIN이 설정되지 않았어요.");
-    return;
+// 로그인 성공 직후 온보딩(닉네임/동네)을 마쳤는지 확인해 분기한다 — 신규 가입자만
+// /onboarding으로 보내고, 기존 사용자는 곧장 홈으로.
+async function routeAfterLogin() {
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user.id;
+  if (userId && (await needsOnboarding(userId))) {
+    router.replace("/onboarding");
+  } else {
+    router.replace("/");
   }
-  Linking.openURL(`${webOrigin}${path}`).catch(() => {
-    Alert.alert("페이지를 여는 데 실패했어요");
-  });
 }
 
 export default function LoginScreen() {
   const { signInWithKakao, signInWithEmail } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [showEmailLogin, setShowEmailLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -28,7 +30,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signInWithKakao();
-      router.replace("/");
+      await routeAfterLogin();
     } catch (err) {
       Alert.alert("로그인에 실패했어요", err instanceof Error ? err.message : String(err));
     } finally {
@@ -40,7 +42,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signInWithEmail(email.trim(), password);
-      router.replace("/");
+      await routeAfterLogin();
     } catch (err) {
       Alert.alert("로그인에 실패했어요", err instanceof Error ? err.message : String(err));
     } finally {
@@ -63,15 +65,29 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        {__DEV__ && (
-          <View className="mb-6 gap-2.5 rounded-2xl border border-line bg-white p-4">
-            <Text className="text-xs font-semibold text-sub-2">
-              개발용 — 카카오 설정 전 테스트 계정 로그인 (프로덕션 빌드에는 없어요)
-            </Text>
+        <Pressable
+          onPress={handleKakaoLogin}
+          disabled={loading}
+          className="h-14 items-center justify-center rounded-2xl bg-[#FEE500] active:opacity-80"
+        >
+          <Text className="text-base font-bold tracking-tight text-[#191919]">
+            {loading ? "로그인 중…" : "카카오로 시작하기"}
+          </Text>
+        </Pressable>
+
+        {/* 카카오 계정이 없는 스토어 심사관용 경로 — 프로덕션에도 유지하되 기본은 숨겨둔다
+            (docs/decisions.md 2026-09-27 사용자 결정). */}
+        {!showEmailLogin ? (
+          <Pressable onPress={() => setShowEmailLogin(true)} className="mt-4 items-center py-2">
+            <Text className="text-[13px] font-medium text-sub-2 underline">다른 방법으로 로그인</Text>
+          </Pressable>
+        ) : (
+          <View className="mt-4 gap-2.5 rounded-2xl border border-line bg-white p-4">
+            <Text className="text-xs font-semibold text-sub-2">이메일로 로그인</Text>
             <TextInput
               value={email}
               onChangeText={setEmail}
-              placeholder="test@ttangttang.local"
+              placeholder="이메일"
               placeholderTextColor="#AEB5BD"
               autoCapitalize="none"
               keyboardType="email-address"
@@ -91,24 +107,12 @@ export default function LoginScreen() {
               disabled={loading || !email || !password}
               className="h-12 items-center justify-center rounded-xl bg-ink active:opacity-80 disabled:opacity-40"
             >
-              <Text className="text-sm font-bold text-white">
-                {loading ? "로그인 중…" : "이메일로 로그인 (개발용)"}
-              </Text>
+              <Text className="text-sm font-bold text-white">{loading ? "로그인 중…" : "이메일로 로그인"}</Text>
             </Pressable>
           </View>
         )}
 
-        <Pressable
-          onPress={handleKakaoLogin}
-          disabled={loading}
-          className="mb-10 h-14 items-center justify-center rounded-2xl bg-[#FEE500] active:opacity-80"
-        >
-          <Text className="text-base font-bold tracking-tight text-[#191919]">
-            {loading ? "로그인 중…" : "카카오로 시작하기"}
-          </Text>
-        </Pressable>
-
-        <View className="mb-8 flex-row items-center justify-center gap-3">
+        <View className="mb-8 mt-10 flex-row items-center justify-center gap-3">
           <Pressable onPress={() => openLegalPage("/terms")}>
             <Text className="text-xs font-medium text-sub-2 underline">이용약관</Text>
           </Pressable>

@@ -86,8 +86,11 @@ export default function TradesScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface-warm" edges={["top"]}>
-      <View className="px-5 pb-2.5 pt-3.5">
+      <View className="flex-row items-center justify-between px-5 pb-2.5 pt-3.5">
         <Text className="text-[19px] font-bold tracking-tight text-ink">거래</Text>
+        <Pressable onPress={() => router.push("/settings")} hitSlop={8}>
+          <Text className="text-[13px] font-semibold text-sub">설정</Text>
+        </Pressable>
       </View>
       <ScrollView
         className="flex-1"
