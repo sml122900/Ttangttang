@@ -261,9 +261,20 @@ DB 쪽 원자성(철회 레이스, 중복 낙찰 차단, NULL-safe 판매자 확
 | 1 — 돈 | P5 카드 등록-사용자 바인딩 + 오픈 리다이렉트 차단 | ✅ | e2e 3단계 7건 |
 | 1 — 돈 | P7 모바일 수락 예외 처리 / P8 409 코드 분리 | ✅ | P8 e2e 2건, P7은 폰 확인 |
 | 1 — 돈 | 제시가 ≥ 시작가 DB 제약 (기존 트리거에 에러 코드 보강) | ✅ | e2e 2단계 2건 |
-| 2 — 인프라 | — | ⏳ 사용자 확인 대기 | |
+| 2 — 인프라 | 환경 분리 문서 + Supabase keep-alive GitHub Actions | ✅ | `docs/decisions/environment-separation.md`, `.github/workflows/supabase-keepalive.yml` |
+| 2 — 인프라 | payment_incidents → Discord 알림 릴레이 | ✅(코드) / ⏳(연결) | `/api/webhooks/payment-incident`. Supabase Database Webhook 연결은 사용자 조치 필요 |
+| 2 — 인프라 | apps/web/.env.example, eas.json 프로필 분리, Vercel region(icn1) | ✅ | |
+| 2 — 인프라 | 개인정보처리방침·이용약관 법정 항목 보강 | ✅(초안) | 법률 검토·[담당자] 등 자리표시자 채우기는 사용자 몫 |
+| 2 — 인프라 | Vercel 배포, ngrok 제거 | ⏳ 사용자 조치 대기 | 아래 "필요한 조치" 참고 |
+| 3 — 정책 필수 | — | 미착수 | |
 
 ### 새로 발견한 리스크
 - **dev Supabase 프로젝트가 무료 플랜 무활동으로 일시정지됐었다** (2026-09-27 사용자 복구). 7일 무활동이면
-  다시 멈춘다 → prod는 유료 플랜 필요 여부를 2단계 환경 분리 문서에서 다룬다.
+  다시 멈춘다 → `.github/workflows/supabase-keepalive.yml`로 3일마다 ping, prod는 면접·시연 기간
+  Pro 플랜 전환 옵션을 `docs/decisions/environment-separation.md`에 정리했다.
 - 이 감사의 "제시가 DB 미강제" 항목은 오진이었다(§4 정정). 감사 결론은 원격 DB·코드로 재확인한 뒤 구현할 것.
+- **개인정보처리방침 §5(국외 이전)를 단정하지 않았다**: Supabase DB는 서울 리전이지만 Supabase·Vercel
+  둘 다 해외 법인이라 국외 이전 해당 여부가 실제로 모호하다 — 법률 검토 항목으로 남겨뒀다.
+- **계정 삭제 기능이 아직 없는 상태로 정책 페이지가 배포된다**: §8·이용약관 제7조가 "설정 메뉴 또는
+  웹 페이지"를 언급하지만 실제 기능은 3단계(A1)에서 만든다. 정책 문구가 앞서가지 않도록 3단계 완료
+  즉시 이 페이지들을 다시 손볼 것 — 잊지 않게 여기 남긴다.
