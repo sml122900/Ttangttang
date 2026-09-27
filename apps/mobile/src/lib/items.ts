@@ -12,6 +12,10 @@ interface ItemRow {
   created_at: string;
 }
 
+interface ItemDetailRow extends ItemRow {
+  seller_id: string;
+}
+
 interface StatsRow {
   item_id: string;
   applicant_count: number;
@@ -67,14 +71,15 @@ export interface ItemDetail {
   createdAt: string;
   applicantCount: number;
   topOfferPrice: number | null;
+  sellerId: string;
 }
 
 export async function fetchItemDetail(id: string): Promise<ItemDetail | null> {
   const { data: item, error: itemError } = await supabase
     .from("items")
-    .select("id,title,description,start_price,neighborhood,status,pickup_slots,created_at")
+    .select("id,title,description,start_price,neighborhood,status,pickup_slots,created_at,seller_id")
     .eq("id", id)
-    .maybeSingle<ItemRow>();
+    .maybeSingle<ItemDetailRow>();
   if (itemError) throw itemError;
   if (!item) return null;
 
@@ -96,6 +101,7 @@ export async function fetchItemDetail(id: string): Promise<ItemDetail | null> {
     createdAt: item.created_at,
     applicantCount: stat?.applicant_count ?? 0,
     topOfferPrice: stat?.top_offer_price ?? null,
+    sellerId: item.seller_id,
   };
 }
 

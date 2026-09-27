@@ -4,6 +4,8 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { AuctionStrip } from "@/components/AuctionStrip";
+import { ReportSheet } from "@/components/ReportSheet";
+import { useAuth } from "@/lib/auth";
 import { fetchItemDetail, type ItemDetail } from "@/lib/items";
 import { won } from "@/lib/format";
 
@@ -23,10 +25,12 @@ const SAFETY_STEPS = [
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { session } = useAuth();
   const insets = useSafeAreaInsets();
   const [item, setItem] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +107,12 @@ export default function ItemDetailScreen() {
                 </View>
               ))}
             </View>
+
+            {session && session.user.id !== item.sellerId && (
+              <Pressable onPress={() => setReportOpen(true)} className="mx-5 mb-4 self-start">
+                <Text className="text-xs font-medium text-sub-2 underline">이 매물 신고하기</Text>
+              </Pressable>
+            )}
           </ScrollView>
 
           <View
@@ -117,16 +127,33 @@ export default function ItemDetailScreen() {
                 {item.applicantCount > 0 ? "현재 최고 제시가" : "시작가"}
               </Text>
             </View>
-            <Pressable
-              className="h-[54px] flex-1 items-center justify-center rounded-2xl bg-brand active:bg-brand-press disabled:opacity-40"
-              disabled={item.status !== "live"}
-              onPress={() => router.push(`/item/${item.id}/apply`)}
-            >
-              <Text className="text-[16.5px] font-bold tracking-tight text-white">
-                {item.status === "live" ? "지원서 쓰기 (30초)" : "마감된 매물이에요"}
-              </Text>
-            </Pressable>
+            {session?.user.id === item.sellerId ? (
+              <Pressable
+                className="h-[54px] flex-1 items-center justify-center rounded-2xl bg-brand-tint active:opacity-80"
+                onPress={() => router.push(`/item/${item.id}/applicants`)}
+              >
+                <Text className="text-[16.5px] font-bold tracking-tight text-brand">내 매물 · 지원서 보기</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                className="h-[54px] flex-1 items-center justify-center rounded-2xl bg-brand active:bg-brand-press disabled:opacity-40"
+                disabled={item.status !== "live"}
+                onPress={() => router.push(`/item/${item.id}/apply`)}
+              >
+                <Text className="text-[16.5px] font-bold tracking-tight text-white">
+                  {item.status === "live" ? "지원서 쓰기 (30초)" : "마감된 매물이에요"}
+                </Text>
+              </Pressable>
+            )}
           </View>
+
+          <ReportSheet
+            visible={reportOpen}
+            onClose={() => setReportOpen(false)}
+            targetType="item"
+            targetId={item.id}
+            blockTarget={{ userId: item.sellerId, nickname: "이 판매자" }}
+          />
         </>
       )}
     </SafeAreaView>

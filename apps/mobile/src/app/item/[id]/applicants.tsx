@@ -5,6 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { AwardStamp } from "@/components/AwardStamp";
 import { MoneySheet } from "@/components/MoneySheet";
+import { ReportSheet } from "@/components/ReportSheet";
 import { acceptApplication, fetchApplicants, type ApplicantRow } from "@/lib/applications";
 import { useAuth } from "@/lib/auth";
 import { fetchItemDetail, type ItemDetail } from "@/lib/items";
@@ -26,6 +27,7 @@ export default function ApplicantsScreen() {
   const [accepting, setAccepting] = useState(false);
   const [awarded, setAwarded] = useState<ApplicantRow | null>(null);
   const [awardedTxId, setAwardedTxId] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<ApplicantRow | null>(null);
 
   const load = useCallback(async () => {
     const [itemData, applicantsData] = await Promise.all([fetchItemDetail(id), fetchApplicants(id)]);
@@ -180,6 +182,10 @@ export default function ApplicantsScreen() {
                     </Text>
                   </View>
                 ) : null}
+
+                <Pressable onPress={() => setReportTarget(a)} className="mt-3 self-start">
+                  <Text className="text-[11px] font-medium text-sub-2 underline">신고</Text>
+                </Pressable>
               </View>
             );
           })
@@ -268,6 +274,17 @@ export default function ApplicantsScreen() {
           </View>
         )}
       </MoneySheet>
+
+      <ReportSheet
+        visible={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        targetType="application"
+        targetId={reportTarget?.applicationId ?? ""}
+        blockTarget={
+          reportTarget ? { userId: reportTarget.applicant.id, nickname: reportTarget.applicant.nickname } : undefined
+        }
+        onBlocked={() => load()}
+      />
     </SafeAreaView>
   );
 }

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { ReportSheet } from "@/components/ReportSheet";
 import {
   fetchChatTransaction,
   fetchMessages,
@@ -33,6 +34,7 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     if (!session || !txId) return;
@@ -114,6 +116,9 @@ export default function ChatScreen() {
             {tx.itemTitle}
           </Text>
         </View>
+        <Pressable onPress={() => setReportOpen(true)} hitSlop={8} className="px-1">
+          <Text className="text-[12px] font-medium text-sub-2 underline">신고</Text>
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView
@@ -175,6 +180,14 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <ReportSheet
+        visible={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="user"
+        targetId={tx.counterparty.id}
+        blockTarget={{ userId: tx.counterparty.id, nickname: tx.counterparty.nickname }}
+      />
     </SafeAreaView>
   );
 }
