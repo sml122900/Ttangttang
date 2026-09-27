@@ -1,0 +1,48 @@
+name: Supabase keep-alive
+
+# 무료 플랜 Supabase 프로젝트는 약 7일간 API 요청이 없으면 자동 일시정지된다(docs/decisions.md
+# 2단계, 2026-09-27에 dev 프로젝트가 실제로 이 문제로 멈췄다). 3일마다 가벼운 select 한 번으로
+# "활동"을 발생시켜 정지를 막는다 — 스키마를 바꾸지 않는 순수 조회이므로 실패해도 데이터에는
+# 영향이 없다.
+#
+# 시크릿(둘 다 anon/publishable 키 — service_role 아님, 유출돼도 RLS로 보호됨):
+#   SUPABASE_URL_DEV        — 필수. 현재 dev/e2e 프로젝트.
+#   SUPABASE_ANON_KEY_DEV   — 필수.
+#   SUPABASE_URL_PROD       — 선택. 사용자가 프로덕션 프로젝트를 만든 뒤 추가.
+#   SUPABASE_ANON_KEY_PROD  — 선택.
+# 아래 "필요한 조치" 목록의 gh secret set 명령으로 등록한다.
+
+on:
+  schedule:
+    - cron: "0 3 */3 * *" # 매 3일, 03:00 UTC(한국시간 정오)
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping dev project (item_public_stats, anon 조회 가능한 공개 뷰)
+        env:
+          URL: ${{ secrets.SUPABASE_URL_DEV }}
+          KEY: ${{ secrets.SUPABASE_ANON_KEY_DEV }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "::error::SUPABASE_URL_DEV / SUPABASE_ANON_KEY_DEV 시크릿이 없어요"
+            exit 1
+          fi
+          curl -sf "$URL/rest/v1/item_public_stats?select=item_id&limit=1" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o /dev/null
+          echo "dev project pinged"
+
+      - name: Ping prod project (설정된 경우에만)
+        env:
+          URL: ${{ secrets.SUPABASE_URL_PROD }}
+          KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "SUPABASE_URL_PROD 미설정 — 프로덕션 프로젝트 생성 전이므로 스킵"
+            exit 0
+          fi
+          curl -sf "$URL/rest/v1/item_public_stats?select=item_id&limit=1" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -o /dev/null
+          echo "prod project pinged"
