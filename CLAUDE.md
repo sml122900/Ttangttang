@@ -30,10 +30,13 @@
   - 수락=결제 체인 API (`apps/web/app/api/applications/[id]/accept`).
   - 지원서 작성/철회, 판매자 지원서 목록/수락, 낙찰 확정(땅땅 더블 노크 스탬프).
   - 카카오 미설정 상태에서 실기기 테스트를 위해 `__DEV__` 전용 이메일/비밀번호 로그인 추가.
-  - `scripts/e2e-flow.mjs` — 폰 없이 매물등록/지원서/수락 API/messages RLS(당사자·제3자·anon)를
-    검증하는 헤드리스 스크립트(`pnpm e2e`). 결제(charge) 단계는 `SKIP_CHARGE`(기본 true)로
-    분리 — 토스에 전용 테스트 카드가 없어(`docs/troubleshooting/toss-billing-no-dedicated-test-card.md`)
-    실카드 정보 없이는 검증 불가능하기 때문.
+  - `scripts/e2e-flow.mjs` — 폰 없이 매물등록/제약/카드등록 바인딩/수락 API 결제 체인/messages RLS를
+    검증하는 헤드리스 스크립트(`pnpm e2e`). 스크립트가 모의 토스 서버(`scripts/lib/mock-toss.mjs`)와
+    apps/web dev 서버를 직접 띄우고 `TOSS_API_BASE`로 연결한다 — 토스 성공/거절/예외/타임아웃과
+    결제 취소 보상 경로를 실카드 없이 검증 (근거: `docs/decisions.md` 1단계).
+  - 결제 체인 보강(2026-09-27, `docs/launch-audit.md` §4·§7): 결과 모름 → orderId 대조, 확정 실패 →
+    결제 취소 보상, `payment_incidents` 기록, 카드 등록 1회용 세션(`billing_auth_sessions`).
+  - Supabase CLI는 dev 프로젝트에 link됨. 무료 플랜이라 7일 무활동이면 일시정지된다(대시보드에서 복구).
   - 남은 것: 실기기 1회 E2E(카드등록→지원→수락→결제 승인→토스 결제창 인앱 복귀→확정) 통과 확인.
 - **Phase 4 (신뢰 루프)**, **Phase 5 (출시)** — 미착수.
 

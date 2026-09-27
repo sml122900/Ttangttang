@@ -1,5 +1,8 @@
 # 헤드리스 E2E 스크립트에서 결제 승인 단계를 분리(SKIP_CHARGE)
 
+> **대체됨 (2026-09-27)**: e2e는 이제 모의 토스 서버(`TOSS_API_BASE`)로 결제 체인 전 경로를 검증한다.
+> `SKIP_CHARGE`/`TEST_CARD_*`는 제거됐다. 근거는 `docs/decisions.md` 1단계.
+
 ## Problem
 Phase 3 핵심 플로우(§3 PROJECT.md: 지원→수락→자동결제→낙찰)를 폰 없이 스크립트로 검증하고
 싶었다. 매물 등록·지원서 제출·수락 API 호출·messages RLS는 Supabase 클라이언트와 `fetch`만
