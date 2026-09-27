@@ -3,6 +3,7 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { getQueryParams } from "expo-auth-session/build/QueryParams";
 import type { Session } from "@supabase/supabase-js";
+import { registerForPushNotifications } from "./push";
 import { supabase } from "./supabase";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -51,6 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       linkSub.remove();
     };
   }, []);
+
+  // 4단계 — 로그인될 때마다(세션이 바뀔 때마다) 푸시 토큰을 등록·갱신한다. 시뮬레이터/권한
+  // 거부 등으로 실패해도 로그인 자체를 막으면 안 되므로 조용히 흡수한다.
+  useEffect(() => {
+    if (!session?.user.id) return;
+    registerForPushNotifications(session.user.id).catch((err) => {
+      console.warn("[push] registration failed", err instanceof Error ? err.message : err);
+    });
+  }, [session?.user.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
