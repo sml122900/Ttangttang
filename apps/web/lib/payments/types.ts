@@ -4,6 +4,9 @@
 
 export interface BillingKeyResult {
   billingKey: string;
+  /** 표시용 카드 정보 (settings/payment 카드 관리, 4단계) — 응답에 없으면 둘 다 null. */
+  cardCompany: string | null;
+  cardNumberMasked: string | null;
 }
 
 export interface ChargePaid {

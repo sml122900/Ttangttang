@@ -6,7 +6,7 @@ import { router } from "expo-router";
 import { MoneySheet } from "@/components/MoneySheet";
 import { deleteAccount, signOutAfterDeletion } from "@/lib/account";
 import { useAuth } from "@/lib/auth";
-import { openCardRegistration } from "@/lib/billing";
+import { deleteBillingKey, getMyCardInfo, openCardRegistration, type MyCardInfo } from "@/lib/billing";
 import { openLegalPage } from "@/lib/legal";
 import { fetchMyBlocks, unblockUser, type BlockedUserRow } from "@/lib/safety";
 
@@ -17,7 +17,9 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const [blocks, setBlocks] = useState<BlockedUserRow[]>([]);
   const [loadingBlocks, setLoadingBlocks] = useState(true);
+  const [card, setCard] = useState<MyCardInfo | null | undefined>(undefined);
   const [registeringCard, setRegisteringCard] = useState(false);
+  const [deletingCard, setDeletingCard] = useState(false);
   const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -31,9 +33,18 @@ export default function SettingsScreen() {
     }
   }, []);
 
+  const loadCard = useCallback(async () => {
+    try {
+      setCard(await getMyCardInfo());
+    } catch {
+      setCard(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadBlocks();
-  }, [loadBlocks]);
+    loadCard();
+  }, [loadBlocks, loadCard]);
 
   async function handleUnblock(row: BlockedUserRow) {
     try {
@@ -54,11 +65,33 @@ export default function SettingsScreen() {
         return;
       }
       Alert.alert("카드가 등록됐어요");
+      await loadCard();
     } catch (err) {
       Alert.alert("카드 등록 중 오류가 발생했어요", err instanceof Error ? err.message : String(err));
     } finally {
       setRegisteringCard(false);
     }
+  }
+
+  function handleDeleteCard() {
+    Alert.alert("등록된 카드를 삭제할까요?", "삭제하면 새 지원을 하기 전에 카드를 다시 등록해야 해요.", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제하기",
+        style: "destructive",
+        onPress: async () => {
+          setDeletingCard(true);
+          try {
+            await deleteBillingKey();
+            setCard(null);
+          } catch (err) {
+            Alert.alert("카드 삭제에 실패했어요", err instanceof Error ? err.message : String(err));
+          } finally {
+            setDeletingCard(false);
+          }
+        },
+      },
+    ]);
   }
 
   async function handleSignOut() {
@@ -101,10 +134,48 @@ export default function SettingsScreen() {
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
         <Text className="px-5 pb-2.5 pt-3.5 text-[13px] font-semibold text-sub-2">결제</Text>
         <View className="mx-5 mb-3 rounded-card border border-line bg-white px-4 py-4">
-          <Pressable onPress={handleCardRegister} disabled={registeringCard} className="flex-row items-center justify-between">
-            <Text className="text-[14.5px] font-semibold text-ink">결제 카드 다시 등록하기</Text>
-            {registeringCard ? <ActivityIndicator size="small" /> : <Feather name="chevron-right" size={18} color="#8B95A1" />}
-          </Pressable>
+          {card === undefined ? (
+            <ActivityIndicator size="small" />
+          ) : card ? (
+            <>
+              <Text className="text-[14.5px] font-semibold text-ink">
+                {card.cardCompany ?? "등록된 카드"} {card.cardNumberMasked ?? ""}
+              </Text>
+              <View className="mt-3 flex-row gap-2">
+                <Pressable
+                  onPress={handleCardRegister}
+                  disabled={registeringCard || deletingCard}
+                  className="h-10 flex-1 items-center justify-center rounded-xl border border-line active:bg-line-soft"
+                >
+                  {registeringCard ? (
+                    <ActivityIndicator size="small" />
+                  ) : (
+                    <Text className="text-[13.5px] font-semibold text-ink-2">카드 변경</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={handleDeleteCard}
+                  disabled={registeringCard || deletingCard}
+                  className="h-10 flex-1 items-center justify-center rounded-xl border border-line active:bg-line-soft"
+                >
+                  {deletingCard ? (
+                    <ActivityIndicator size="small" />
+                  ) : (
+                    <Text className="text-[13.5px] font-semibold text-danger">카드 삭제</Text>
+                  )}
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <Pressable
+              onPress={handleCardRegister}
+              disabled={registeringCard}
+              className="flex-row items-center justify-between"
+            >
+              <Text className="text-[14.5px] font-semibold text-ink">등록된 카드가 없어요 — 등록하기</Text>
+              {registeringCard ? <ActivityIndicator size="small" /> : <Feather name="chevron-right" size={18} color="#8B95A1" />}
+            </Pressable>
+          )}
         </View>
 
         <Text className="px-5 pb-2.5 pt-3.5 text-[13px] font-semibold text-sub-2">차단 관리</Text>

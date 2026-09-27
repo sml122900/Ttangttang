@@ -1,5 +1,6 @@
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import { supabase } from "./supabase";
 
 // Expo Go에서는 Linking.createURL이 세션마다 다른 exp://<LAN-IP>:<port>를 반환한다 —
 // 이 값을 apps/web에 넘겨 카드등록 완료 후 정확히 이 앱으로 되돌아오게 한다.
@@ -36,4 +37,25 @@ export async function openCardRegistration(accessToken: string): Promise<CardReg
   }
   const ok = new URL(result.url).searchParams.get("ok") === "1";
   return { ok };
+}
+
+export interface MyCardInfo {
+  cardCompany: string | null;
+  cardNumberMasked: string | null;
+}
+
+// 4단계 settings/payment 카드 관리 — get_my_card_info() RPC(SECURITY DEFINER)가 billing_key
+// 원문 없이 표시용 정보만 돌려준다. 행이 없으면(카드 미등록) null.
+export async function getMyCardInfo(): Promise<MyCardInfo | null> {
+  const { data, error } = await supabase
+    .rpc("get_my_card_info")
+    .maybeSingle<{ card_company: string | null; card_number_masked: string | null }>();
+  if (error) throw error;
+  if (!data) return null;
+  return { cardCompany: data.card_company, cardNumberMasked: data.card_number_masked };
+}
+
+export async function deleteBillingKey(): Promise<void> {
+  const { error } = await supabase.rpc("delete_billing_key");
+  if (error) throw error;
 }

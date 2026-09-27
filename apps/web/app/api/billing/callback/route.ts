@@ -28,12 +28,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { billingKey } = await paymentGateway.issueBillingKey({ authKey, customerKey });
+    const { billingKey, cardCompany, cardNumberMasked } = await paymentGateway.issueBillingKey({
+      authKey,
+      customerKey,
+    });
 
     const admin = createServiceRoleClient();
-    const { error } = await admin
-      .from("billing_keys")
-      .upsert({ profile_id: consumed.profileId, billing_key: billingKey, updated_at: new Date().toISOString() });
+    const { error } = await admin.from("billing_keys").upsert({
+      profile_id: consumed.profileId,
+      billing_key: billingKey,
+      card_company: cardCompany,
+      card_number_masked: cardNumberMasked,
+      updated_at: new Date().toISOString(),
+    });
     if (error) throw error;
 
     return done("ok=1");

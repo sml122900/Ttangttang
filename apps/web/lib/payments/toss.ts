@@ -52,6 +52,22 @@ function str(v: unknown, fallback: string): string {
   return typeof v === "string" ? v : fallback;
 }
 
+function strOrNull(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+// 4단계 settings/payment 카드 관리용 — 토스 응답이 카드 정보를 최상위(cardCompany/cardNumber)에
+// 두는지 card 객체 안에 두는지 이 세션에서 실제 응답으로 검증하지 못했다(테스트 키로는 카드
+// 발급 자체가 막힘, docs/troubleshooting/toss-billing-no-dedicated-test-card.md). 두 형태를 다
+// 시도하고 없으면 null로 둔다 — 둘 다 nullable 컬럼이라 실패해도 카드 등록 자체는 안 깨진다.
+// 실카드로 인앱 확인할 때(docs/phone-check.md) 실제 필드명을 확인해 좁혀야 한다.
+function extractCardInfo(json: Record<string, unknown>): { company: string | null; masked: string | null } {
+  const card = (json.card as Record<string, unknown> | undefined) ?? {};
+  const company = strOrNull(json.cardCompany) ?? strOrNull(card.company) ?? strOrNull(card.issuerCode);
+  const masked = strOrNull(json.cardNumber) ?? strOrNull(card.number);
+  return { company, masked };
+}
+
 export const tossGateway: PaymentGateway = {
   async issueBillingKey({ authKey, customerKey }): Promise<BillingKeyResult> {
     const { ok, json } = await tossFetch("/billing/authorizations/issue", {
@@ -61,7 +77,8 @@ export const tossGateway: PaymentGateway = {
     if (!ok || typeof json.billingKey !== "string") {
       throw new Error(str(json.message, "빌링키 발급에 실패했어요"));
     }
-    return { billingKey: json.billingKey };
+    const { company, masked } = extractCardInfo(json);
+    return { billingKey: json.billingKey, cardCompany: company, cardNumberMasked: masked };
   },
 
   async chargeBilling({ billingKey, customerKey, amount, orderId, orderName }): Promise<ChargeResult> {
