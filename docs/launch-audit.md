@@ -265,8 +265,8 @@ DB 쪽 원자성(철회 레이스, 중복 낙찰 차단, NULL-safe 판매자 확
 | 2 — 인프라 | payment_incidents → Discord 알림 릴레이 | ✅(코드) / ⏳(연결) | `/api/webhooks/payment-incident`. Supabase Database Webhook 연결은 사용자 조치 필요 |
 | 2 — 인프라 | apps/web/.env.example, eas.json 프로필 분리, Vercel region(icn1) | ✅ | |
 | 2 — 인프라 | 개인정보처리방침·이용약관 법정 항목 보강 | ✅(초안) | 법률 검토·[담당자] 등 자리표시자 채우기는 사용자 몫 |
-| 2 — 인프라 | Vercel 배포, ngrok 제거 | ⏳ 사용자 조치 대기 | 아래 "필요한 조치" 참고 |
-| 3 — 정책 필수 | — | 미착수 | |
+| 2 — 인프라 | Vercel 배포, ngrok 제거 | ✅ | https://ttangttang-web.vercel.app (2026-09-28). `eas.json`/`apps/mobile/.env`/CLAUDE.md 갱신 완료. GitHub Secrets·Discord 웹훅 연결은 사용자 조치 대기(`environment-separation.md` "필요한 조치") |
+| 3 — 정책 필수 | — | 진행 중 | |
 
 ### 새로 발견한 리스크
 - **dev Supabase 프로젝트가 무료 플랜 무활동으로 일시정지됐었다** (2026-09-27 사용자 복구). 7일 무활동이면

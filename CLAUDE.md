@@ -15,8 +15,13 @@
   `docs/decisions/dev-environment-cloud-and-tunnels.md`).
 - 각 앱의 `.env.example`을 보고 `.env`를 채울 것 (`.env`는 전부 gitignore됨). 시크릿 키는
   대화 중에 값 자체를 노출하지 말고, 사용자가 직접 파일에 입력하도록 안내한다.
-- 실기기 테스트: `apps/web`은 ngrok, Expo는 `expo start --tunnel`로 https/터널을 통해 연결한다
-  (토스 콜백이 https를 요구하고, LAN IP 감지가 이 네트워크 환경에서 불안정하기 때문).
+- `apps/web`은 Vercel에 배포되어 있다: https://ttangttang-web.vercel.app (Production/Preview
+  Environment 둘 다 지금은 dev Supabase 프로젝트를 가리킨다 — `docs/decisions/
+  environment-separation.md`). 실기기 테스트 시 `apps/mobile/.env`의 `EXPO_PUBLIC_WEB_ORIGIN`은
+  기본적으로 이 주소를 쓴다(더 이상 ngrok 불필요). `apps/web` 자체를 로컬에서 고치며 폰으로
+  확인할 때만 `pnpm web:dev` + 별도 https 터널(ngrok 등)로 일시적으로 바꿔 쓴다.
+- Expo 번들러(Metro) 연결은 `expo start --tunnel`로 한다 (LAN IP 감지가 이 네트워크 환경에서
+  불안정하기 때문 — 위 web origin과는 별개의 터널이다).
 
 ## 진행 상황
 

@@ -1,5 +1,11 @@
 # 로컬 Docker 대신 클라우드 Supabase + 터널 기반 실기기 테스트
 
+> **일부 대체됨 (2026-09-28)**: `apps/web`은 이제 Vercel에 배포돼 있다
+> (https://ttangttang-web.vercel.app, `docs/decisions/environment-separation.md`) — 아래 "대가"로
+> 적은 ngrok 세션마다 URL이 바뀌는 문제는 `apps/web`에는 더 이상 해당하지 않는다. Expo
+> 번들러(Metro)용 `expo start --tunnel`은 그대로 유효하다(별개의 터널). Supabase를 클라우드
+> 프로젝트로 쓰는 이유(LAN/VPN 불안정)는 지금도 유효하다.
+
 ## Problem
 Phase 3부터는 결제(토스 빌링) 콜백을 실제 외부 서비스(토스)가 우리 서버로 리다이렉트해야
 하는데, 로컬 `supabase start`(Docker) + LAN IP 조합은 두 가지 문제에 부딪혔다.

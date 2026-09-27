@@ -30,3 +30,8 @@
 - **GitHub Actions keep-alive는 dev/prod 두 프로젝트를 한 워크플로에서 다루되 prod 시크릿이 없으면 그 스텝만 스킵한다**: prod 프로젝트가 아직 없는 지금도 워크플로를 미리 켜둘 수 있고, 나중에 시크릿만 추가하면 별도 파일 없이 확장된다.
 - **개인정보처리방침의 국외 이전 여부는 단정하지 않고 "법률 검토 필요"로 남긴다**: Supabase DB가 서울 리전이라도 운영 법인(Supabase·Vercel)이 해외라 한국 개인정보보호법상 국외 이전 해당 여부가 실제로 해석이 갈리는 영역이다. 확정 짓지 않는 편이 잘못된 법률 판단보다 안전하다.
 - **계정 삭제 관련 정책 문구는 3단계에서 기능이 나오는 즉시 다시 다듬어야 한다**: 지금은 정책이 아직 없는 기능(설정 메뉴, 삭제 웹페이지)을 미리 언급한다 — `launch-audit.md` "새로 발견한 리스크"에 남겨 놓쳐 잊지 않게 했다.
+
+## 2단계 마무리 — Vercel 배포 후 (2026-09-28)
+- **payment_incidents 웹훅 릴레이의 스킵 동작을 실제로 curl로 검증했다**: 시크릿 미설정/시크릿 설정+Discord URL 미설정/잘못된 시크릿 세 가지 경우를 로컬 서버로 재현해 200/200/401을 확인 — 코드를 읽고 "될 것 같다"로 끝내지 않았다.
+- **eas.json production 프로필의 WEB_ORIGIN은 이번에도 채우지 않았다**: dev/preview에 쓴 Vercel URL을 그대로 넣으면 스토어 제출 빌드가 dev Supabase(이 Vercel 배포의 현재 Production Environment가 가리키는 곳)에 실사용자 데이터를 쓰게 된다. prod Supabase + Vercel Production Environment 교체가 끝난 뒤에만 채운다.
+- **CLAUDE.md·dev-environment-cloud-and-tunnels.md의 ngrok 서술은 "web에는 더 이상 불필요, Expo 번들러 터널은 별개로 계속 필요"로 갱신**했다: apps/web은 안정적 URL이 생겼지만 Metro 번들러 연결은 여전히 LAN 불안정 문제가 남아있어 `expo start --tunnel`은 그대로 쓴다.

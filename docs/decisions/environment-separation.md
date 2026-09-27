@@ -52,8 +52,9 @@ Development) 단위로 Supabase 키를 분리한다 — 프로젝트를 두 개�
 | Development | `vercel dev`(로컬) | dev | 로컬에서 Vercel 런타임으로 웹 API 테스트 |
 
 각 Environment에 `apps/web/.env.example`의 키를 전부 등록한다(값은 해당 Supabase 프로젝트 것으로).
-prod Supabase가 아직 없으므로 **지금은 Production Environment에도 dev 키를 넣어 배포**하고,
-prod 프로젝트가 생기면 Production Environment 값만 교체한다(재배포 필요, `vercel --prod`).
+prod Supabase가 아직 없으므로 **지금은 Production Environment에도 dev 키를 넣어 배포**했다
+(2026-09-28, https://ttangttang-web.vercel.app). prod 프로젝트가 생기면 Production Environment
+값만 교체한다(재배포 필요, `vercel --prod`).
 
 ## EAS — 프로필별 env
 
@@ -61,14 +62,18 @@ prod 프로젝트가 생기면 Production Environment 값만 교체한다(재배
 
 | 프로필 | Supabase | WEB_ORIGIN | 용도 |
 |---|---|---|---|
-| development | dev | Vercel Preview/Production URL(2단계 배포 후 확정) | `expo start --dev-client` |
+| development | dev | `https://ttangttang-web.vercel.app` | `expo start --dev-client` |
 | preview | dev | 위와 동일 | 내부테스트 APK |
 | production | **`<TODO: PROD_SUPABASE_URL>`** | **`<TODO: PROD_WEB_ORIGIN>`** | 스토어 제출용 AAB |
 
 `production` 프로필의 값은 실제 문자열이 아니라 `<TODO: ...>` 형태의 자리표시자로 커밋돼 있다 —
 prod Supabase/Vercel이 준비되기 전에 이 값으로 빌드하면 즉시 알아볼 수 있게 일부러 깨뜨려 뒀다.
-채울 때는 `apps/mobile/eas.json`을 직접 수정한다(시크릿이 아니라 공개 가능한 URL/publishable key라
-평문 커밋이 원래 방식이었다 — 그대로 유지).
+**dev/preview에 쓴 `https://ttangttang-web.vercel.app`를 production에 그대로 넣으면 안 된다** —
+이 Vercel 배포의 Production Environment도 지금은 dev Supabase를 가리키고 있어서, 실제 스토어
+빌드가 테스트용 프로젝트에 사용자 데이터를 쓰게 된다. production은 반드시 prod Supabase 프로젝트
+생성 + Vercel Production Environment 값 교체까지 끝난 뒤에 채운다. 채울 때는 `apps/mobile/eas.json`을
+직접 수정한다(시크릿이 아니라 공개 가능한 URL/publishable key라 평문 커밋이 원래 방식이었다 —
+그대로 유지).
 
 ## 자동 정지 대책
 
@@ -92,6 +97,19 @@ gh secret set SUPABASE_ANON_KEY_DEV --body "<apps/web/.env의 NEXT_PUBLIC_SUPABA
 # (prod 프로젝트를 만든 뒤 추가)
 # gh secret set SUPABASE_URL_PROD --body "https://<PROD_REF>.supabase.co"
 # gh secret set SUPABASE_ANON_KEY_PROD --body "<prod publishable key>"
+```
+
+```
+# 2) payment_incidents → Discord 알림 (docs/decisions.md 2단계, apps/web/app/api/webhooks/payment-incident)
+#    a) Vercel 프로젝트 환경변수에 등록 (Production + Preview):
+#         SUPABASE_WEBHOOK_SECRET = openssl rand -hex 32 로 생성한 값
+#         DISCORD_WEBHOOK_URL     = 알림 받을 디스코드 채널의 웹훅 URL
+#    b) Supabase 대시보드 > Database > Webhooks > Create a new hook
+#         Table: payment_incidents, Events: INSERT
+#         URL:    https://ttangttang-web.vercel.app/api/webhooks/payment-incident
+#         Header: x-webhook-secret: <a)의 SUPABASE_WEBHOOK_SECRET과 동일한 값>
+#    둘 다 비어 있으면 릴레이가 조용히 200을 반환하고 아무 일도 하지 않는다(검증 완료,
+#    docs/decisions.md 2단계) — 지금 당장 안 해도 다른 기능에 영향 없음.
 ```
 
 이 파일은 dev 프로젝트가 존재하는 지금 바로 등록 가능하다. prod 관련 두 줄은 프로덕션 Supabase
