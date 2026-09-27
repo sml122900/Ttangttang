@@ -34,7 +34,13 @@
         }
       ],
       "expo-web-browser",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermissionText": "동네를 자동으로 설정하려면 위치 권한이 필요해요. 언제든 직접 검색으로 바꿀 수 있어요."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
