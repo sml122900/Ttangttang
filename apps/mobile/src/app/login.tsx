@@ -1,8 +1,22 @@
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useAuth } from "@/lib/auth";
+
+// §3 결제 리스크 — 지원서 제출 화면이 아니라 로그인 시점에 약관·처리방침을 먼저 보여준다.
+// 앱에 아직 설정 화면이 없어(§6 백로그, settings/payment 등) 지금은 로그인 화면이 유일한
+// 진입점이다. apps/web에 배포된 페이지를 그대로 연다 — 모바일에 내용을 중복 유지하지 않는다.
+function openLegalPage(path: "/terms" | "/privacy") {
+  const webOrigin = process.env.EXPO_PUBLIC_WEB_ORIGIN;
+  if (!webOrigin) {
+    Alert.alert("페이지를 열 수 없어요", "EXPO_PUBLIC_WEB_ORIGIN이 설정되지 않았어요.");
+    return;
+  }
+  Linking.openURL(`${webOrigin}${path}`).catch(() => {
+    Alert.alert("페이지를 여는 데 실패했어요");
+  });
+}
 
 export default function LoginScreen() {
   const { signInWithKakao, signInWithEmail } = useAuth();
@@ -93,6 +107,16 @@ export default function LoginScreen() {
             {loading ? "로그인 중…" : "카카오로 시작하기"}
           </Text>
         </Pressable>
+
+        <View className="mb-8 flex-row items-center justify-center gap-3">
+          <Pressable onPress={() => openLegalPage("/terms")}>
+            <Text className="text-xs font-medium text-sub-2 underline">이용약관</Text>
+          </Pressable>
+          <Text className="text-xs text-sub-2">·</Text>
+          <Pressable onPress={() => openLegalPage("/privacy")}>
+            <Text className="text-xs font-medium text-sub-2 underline">개인정보처리방침</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
