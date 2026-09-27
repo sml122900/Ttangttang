@@ -106,6 +106,9 @@ export default function ItemDetailScreen() {
                   </View>
                 </View>
               ))}
+              <Pressable onPress={() => router.push("/guarantee")} className="mt-1 self-start">
+                <Text className="text-[13px] font-semibold text-brand underline">노쇼 보장 자세히 보기</Text>
+              </Pressable>
             </View>
 
             {session && session.user.id !== item.sellerId && (
@@ -128,12 +131,22 @@ export default function ItemDetailScreen() {
               </Text>
             </View>
             {session?.user.id === item.sellerId ? (
-              <Pressable
-                className="h-[54px] flex-1 items-center justify-center rounded-2xl bg-brand-tint active:opacity-80"
-                onPress={() => router.push(`/item/${item.id}/applicants`)}
-              >
-                <Text className="text-[16.5px] font-bold tracking-tight text-brand">내 매물 · 지원서 보기</Text>
-              </Pressable>
+              <View className="flex-1 flex-row gap-2">
+                <Pressable
+                  className="h-[54px] flex-1 items-center justify-center rounded-2xl bg-brand-tint active:opacity-80"
+                  onPress={() => router.push(`/item/${item.id}/applicants`)}
+                >
+                  <Text className="text-[15px] font-bold tracking-tight text-brand">지원서 보기</Text>
+                </Pressable>
+                {item.status === "live" && (
+                  <Pressable
+                    className="h-[54px] items-center justify-center rounded-2xl border border-line px-4 active:bg-line-soft"
+                    onPress={() => router.push(`/item/${item.id}/edit`)}
+                  >
+                    <Text className="text-[15px] font-bold text-ink-2">수정</Text>
+                  </Pressable>
+                )}
+              </View>
             ) : (
               <Pressable
                 className="h-[54px] flex-1 items-center justify-center rounded-2xl bg-brand active:bg-brand-press disabled:opacity-40"
