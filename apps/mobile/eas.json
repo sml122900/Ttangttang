@@ -13,7 +13,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://bacwpzlenygqnowvcvnp.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_FciE-8jjr_1vjIZSfzRv7w_d4y2N0VO",
-        "EXPO_PUBLIC_WEB_ORIGIN": "<TODO: Vercel 배포 URL로 교체 — docs/decisions/environment-separation.md>"
+        "EXPO_PUBLIC_WEB_ORIGIN": "https://ttangttang-web.vercel.app"
       }
     },
     "preview": {
@@ -25,7 +25,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://bacwpzlenygqnowvcvnp.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_FciE-8jjr_1vjIZSfzRv7w_d4y2N0VO",
-        "EXPO_PUBLIC_WEB_ORIGIN": "<TODO: Vercel 배포 URL로 교체 — docs/decisions/environment-separation.md>"
+        "EXPO_PUBLIC_WEB_ORIGIN": "https://ttangttang-web.vercel.app"
       }
     },
     "production": {
@@ -38,7 +38,7 @@
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "<TODO: 프로덕션 Supabase 프로젝트 생성 후 채울 것 — docs/decisions/environment-separation.md>",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "<TODO: 프로덕션 Supabase publishable key>",
-        "EXPO_PUBLIC_WEB_ORIGIN": "<TODO: 프로덕션 Vercel 도메인>"
+        "EXPO_PUBLIC_WEB_ORIGIN": "<TODO: 프로덕션 Vercel 도메인 — dev용 https://ttangttang-web.vercel.app를 그대로 쓰지 말 것. 이 Vercel 배포는 현재 Production Environment 변수도 dev Supabase를 가리키고 있어(docs/decisions/environment-separation.md), production 프로필에 쓰면 실제 사용자 데이터가 dev/e2e 프로젝트로 들어간다>"
       }
     }
   }
