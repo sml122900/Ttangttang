@@ -63,6 +63,10 @@ export interface ChatTransaction {
   itemTitle: string;
   buyerId: string;
   sellerId: string;
+  status: string;
+  pickupDeadline: string;
+  buyerConfirmedAt: string | null;
+  sellerConfirmedAt: string | null;
   counterparty: { id: string; nickname: string };
 }
 
@@ -71,6 +75,10 @@ interface RawTransaction {
   item_id: string;
   buyer_id: string;
   seller_id: string;
+  status: string;
+  pickup_deadline: string;
+  buyer_confirmed_at: string | null;
+  seller_confirmed_at: string | null;
   items: { title: string } | null;
 }
 
@@ -79,7 +87,7 @@ interface RawTransaction {
 export async function fetchChatTransaction(txId: string, selfId: string): Promise<ChatTransaction | null> {
   const { data: tx, error } = await supabase
     .from("transactions")
-    .select("id,item_id,buyer_id,seller_id,items(title)")
+    .select("id,item_id,buyer_id,seller_id,status,pickup_deadline,buyer_confirmed_at,seller_confirmed_at,items(title)")
     .eq("id", txId)
     .maybeSingle<RawTransaction>();
   if (error) throw error;
@@ -99,6 +107,16 @@ export async function fetchChatTransaction(txId: string, selfId: string): Promis
     itemTitle: tx.items?.title ?? "거래",
     buyerId: tx.buyer_id,
     sellerId: tx.seller_id,
+    status: tx.status,
+    pickupDeadline: tx.pickup_deadline,
+    buyerConfirmedAt: tx.buyer_confirmed_at,
+    sellerConfirmedAt: tx.seller_confirmed_at,
     counterparty: { id: counterpartyId, nickname: profile?.nickname ?? "이웃" },
   };
+}
+
+export async function confirmPickup(txId: string): Promise<{ status: string }> {
+  const { data, error } = await supabase.rpc("confirm_pickup", { p_transaction_id: txId }).single<{ status: string }>();
+  if (error) throw error;
+  return { status: data.status };
 }

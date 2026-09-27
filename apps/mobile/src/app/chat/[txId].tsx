@@ -15,6 +15,7 @@ import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { ReportSheet } from "@/components/ReportSheet";
 import {
+  confirmPickup,
   fetchChatTransaction,
   fetchMessages,
   sendMessage,
@@ -35,6 +36,7 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!session || !txId) return;
@@ -74,6 +76,22 @@ export default function ChatScreen() {
       Alert.alert("전송에 실패했어요", err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
+    }
+  }
+
+  // 4단계 — 수령 확인(구매자 확인 + 판매자 확인 이중 체크). 둘 다 확인하면 서버에서 completed로
+  // 전이한다 — 여기서는 성공 후 tx를 다시 불러와 최신 상태(상대방 확인 여부·완료 여부)를 반영한다.
+  async function handleConfirm() {
+    if (!txId || confirming) return;
+    setConfirming(true);
+    try {
+      await confirmPickup(txId);
+      const fresh = await fetchChatTransaction(txId, session!.user.id);
+      setTx(fresh);
+    } catch (err) {
+      Alert.alert("확인에 실패했어요", err instanceof Error ? err.message : String(err));
+    } finally {
+      setConfirming(false);
     }
   }
 
@@ -120,6 +138,8 @@ export default function ChatScreen() {
           <Text className="text-[12px] font-medium text-sub-2 underline">신고</Text>
         </Pressable>
       </View>
+
+      <PickupConfirmationBanner tx={tx} selfId={session.user.id} confirming={confirming} onConfirm={handleConfirm} />
 
       <KeyboardAvoidingView
         className="flex-1"
@@ -189,5 +209,67 @@ export default function ChatScreen() {
         blockTarget={{ userId: tx.counterparty.id, nickname: tx.counterparty.nickname }}
       />
     </SafeAreaView>
+  );
+}
+
+// §5 돈 레지스터 — 수령 확인은 거래의 마지막 단계라 위트 없이 건조하게. 구매자/판매자
+// 양쪽 확인이 모두 있어야 completed로 넘어간다(§3, confirm_pickup() RPC가 서버에서 강제).
+function PickupConfirmationBanner({
+  tx,
+  selfId,
+  confirming,
+  onConfirm,
+}: {
+  tx: ChatTransaction;
+  selfId: string;
+  confirming: boolean;
+  onConfirm: () => void;
+}) {
+  if (tx.status === "completed") {
+    return (
+      <View className="border-b border-line-soft bg-point-tint px-4 py-3">
+        <Text className="text-[13px] font-semibold text-point">거래가 완료됐어요. 수고하셨어요!</Text>
+      </View>
+    );
+  }
+  if (tx.status === "noshow_settled") {
+    return (
+      <View className="border-b border-line-soft bg-danger/10 px-4 py-3">
+        <Text className="text-[13px] font-semibold text-danger">
+          약속 시간 내 수령하지 않아 노쇼로 정산됐어요.
+        </Text>
+      </View>
+    );
+  }
+
+  const isBuyer = selfId === tx.buyerId;
+  const myConfirmedAt = isBuyer ? tx.buyerConfirmedAt : tx.sellerConfirmedAt;
+  const counterpartyConfirmedAt = isBuyer ? tx.sellerConfirmedAt : tx.buyerConfirmedAt;
+  const deadlineText = new Date(tx.pickupDeadline).toLocaleString("ko-KR", {
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return (
+    <View className="border-b border-line-soft bg-white px-4 py-3">
+      <Text className="text-[12.5px] text-sub">{deadlineText}까지 수령 확인이 필요해요</Text>
+      {myConfirmedAt ? (
+        <Text className="mt-1.5 text-[13px] font-semibold text-sub-2">
+          {counterpartyConfirmedAt ? "확인 완료" : "확인했어요 — 상대방 확인을 기다리는 중"}
+        </Text>
+      ) : (
+        <Pressable
+          onPress={onConfirm}
+          disabled={confirming}
+          className="mt-2 h-10 items-center justify-center rounded-xl bg-brand active:bg-brand-press disabled:opacity-60"
+        >
+          <Text className="text-[13.5px] font-bold text-white">
+            {confirming ? "확인하는 중…" : isBuyer ? "물건을 수령했어요" : "물건을 전달했어요"}
+          </Text>
+        </Pressable>
+      )}
+    </View>
   );
 }

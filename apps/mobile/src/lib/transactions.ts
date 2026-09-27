@@ -4,6 +4,7 @@ export interface MySaleTransaction {
   id: string;
   itemId: string;
   amount: number;
+  status: string;
   buyerNickname: string;
 }
 
@@ -11,6 +12,7 @@ interface RawTx {
   id: string;
   item_id: string;
   amount: number;
+  status: string;
   buyer_id: string;
 }
 
@@ -24,7 +26,7 @@ interface RawProfile {
 export async function fetchMySaleTransactions(sellerId: string): Promise<MySaleTransaction[]> {
   const { data: txs, error } = await supabase
     .from("transactions")
-    .select("id,item_id,amount,buyer_id")
+    .select("id,item_id,amount,status,buyer_id")
     .eq("seller_id", sellerId)
     .returns<RawTx[]>();
   if (error) throw error;
@@ -45,6 +47,7 @@ export async function fetchMySaleTransactions(sellerId: string): Promise<MySaleT
     id: t.id,
     itemId: t.item_id,
     amount: t.amount,
+    status: t.status,
     buyerNickname: nicknameById.get(t.buyer_id) ?? "이웃",
   }));
 }

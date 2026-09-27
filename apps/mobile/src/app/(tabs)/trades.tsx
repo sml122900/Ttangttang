@@ -21,6 +21,13 @@ const APP_STATUS_CHIP: Record<string, { label: string; tone: "quiet" | "gray" | 
   payment_failed: { label: "결제 실패", tone: "red" },
 };
 
+const TX_STATUS_CHIP: Record<string, { label: string; tone: "quiet" | "gray" | "green" | "red" }> = {
+  paid: { label: "수령 대기", tone: "quiet" },
+  completed: { label: "거래 완료", tone: "green" },
+  noshow_settled: { label: "노쇼 정산됨", tone: "red" },
+  refunded: { label: "환불됨", tone: "gray" },
+};
+
 export default function TradesScreen() {
   const { session } = useAuth();
   const [myItems, setMyItems] = useState<MyItemRow[]>([]);
@@ -114,11 +121,11 @@ export default function TradesScreen() {
                   <Text numberOfLines={1} className="flex-1 text-[15px] font-semibold text-ink">
                     {it.title}
                   </Text>
-                  <Chip tone={isLive ? "live" : tx ? "green" : "gray"}>
+                  <Chip tone={isLive ? "live" : tx ? TX_STATUS_CHIP[tx.status]?.tone ?? "gray" : "gray"}>
                     {isLive
                       ? `지원 ${it.applicantCount}건`
                       : tx
-                        ? "낙찰 완료"
+                        ? (TX_STATUS_CHIP[tx.status]?.label ?? tx.status)
                         : it.status === "cancelled"
                           ? "취소됨"
                           : it.status}
@@ -130,16 +137,22 @@ export default function TradesScreen() {
                       {it.applicantCount > 0 ? "현재 최고 제시가" : "시작가"}{" "}
                       {won(it.applicantCount > 0 ? (it.topOfferPrice ?? it.start_price) : it.start_price)}
                     </Text>
-                    {it.applicantCount > 0 && (
+                    <View className="mt-3 flex-row gap-2">
+                      {it.applicantCount > 0 && (
+                        <Pressable
+                          onPress={() => router.push(`/item/${it.id}/applicants`)}
+                          className="h-11 flex-1 items-center justify-center rounded-xl bg-brand-tint active:opacity-80"
+                        >
+                          <Text className="text-[13.5px] font-bold text-brand">지원서 보고 낙찰자 고르기</Text>
+                        </Pressable>
+                      )}
                       <Pressable
-                        onPress={() => router.push(`/item/${it.id}/applicants`)}
-                        className="mt-3 h-11 items-center justify-center rounded-xl bg-brand-tint active:opacity-80"
+                        onPress={() => router.push(`/item/${it.id}/edit`)}
+                        className="h-11 flex-1 items-center justify-center rounded-xl border border-line active:bg-line-soft"
                       >
-                        <Text className="text-[13.5px] font-bold text-brand">
-                          지원서 보고 낙찰자 고르기
-                        </Text>
+                        <Text className="text-[13.5px] font-bold text-sub">매물 관리</Text>
                       </Pressable>
-                    )}
+                    </View>
                   </>
                 ) : tx ? (
                   <>
