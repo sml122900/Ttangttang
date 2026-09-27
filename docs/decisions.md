@@ -35,3 +35,17 @@
 - **payment_incidents 웹훅 릴레이의 스킵 동작을 실제로 curl로 검증했다**: 시크릿 미설정/시크릿 설정+Discord URL 미설정/잘못된 시크릿 세 가지 경우를 로컬 서버로 재현해 200/200/401을 확인 — 코드를 읽고 "될 것 같다"로 끝내지 않았다.
 - **eas.json production 프로필의 WEB_ORIGIN은 이번에도 채우지 않았다**: dev/preview에 쓴 Vercel URL을 그대로 넣으면 스토어 제출 빌드가 dev Supabase(이 Vercel 배포의 현재 Production Environment가 가리키는 곳)에 실사용자 데이터를 쓰게 된다. prod Supabase + Vercel Production Environment 교체가 끝난 뒤에만 채운다.
 - **CLAUDE.md·dev-environment-cloud-and-tunnels.md의 ngrok 서술은 "web에는 더 이상 불필요, Expo 번들러 터널은 별개로 계속 필요"로 갱신**했다: apps/web은 안정적 URL이 생겼지만 Metro 번들러 연결은 여전히 LAN 불안정 문제가 남아있어 `expo start --tunnel`은 그대로 쓴다.
+
+## 3단계 — 설정 화면 → 계정 삭제 → 신고·차단 → 온보딩
+- **auth.users는 하드 삭제 대신 소프트 삭제(`admin.deleteUser(id, true)`)로 구현했다**: `profiles.id`가 `auth.users(id)`를 `on delete cascade`로 참조하는데, `items`/`applications`/`transactions`/`messages`가 `profiles(id)`를 cascade 없이(RESTRICT) 참조한다. auth.users를 물리적으로 지우면 그 cascade가 profiles까지 내려가고, 그 순간 거래 이력이 있는 사용자는 RESTRICT에 걸려 삭제 자체가 실패한다 — "auth.users 삭제"와 "거래·메시지 보존"을 동시에 만족하는 유일한 방법이 소프트 삭제였다. 로그인 수단 무효화·identity 제거는 그대로 되고, FK만 깨지지 않는다. `scripts/verify-stage3.mjs`로 재로그인 거부 + profiles 행 생존을 직접 확인했다.
+- **진행 중(paid) 거래가 있으면 탈퇴를 막는다**: 사용자가 명시적으로 결정하지 않은 부분이라 가장 보수적인 기본값을 골랐다 — 돈이 오간 뒤 한쪽이 사라지면 수령 확인·노쇼 정산을 아무도 못 하게 된다. 되돌리기 쉬운 제약(그냥 거래가 끝나길 기다리면 됨)이라 우선 이렇게 하고, 필요하면 나중에 완화한다.
+- **탈퇴 시 내 live 매물은 취소 처리한다**: 판매자가 사라지면 어차피 응대할 수 없는 매물이라, 남겨두면 구매자만 지원서를 쓰고 낙찰받을 수 없는 상태가 된다.
+- **웹 계정 삭제는 즉시 자동 처리가 아니라 요청 접수 + 수동 처리**: 이 서비스는 카카오 로그인만 있고 별도 웹 로그인이 없어, 본인 확인 없이 웹에서 즉시 삭제를 실행할 방법이 없다. 플레이스토어 정책은 웹 경로가 "요청 처리 과정"이어도 된다고 허용하므로(즉시 자동일 필요는 없음), 인앱 경로(즉시 자동)와 웹 경로(요청 접수)로 역할을 나눴다.
+- **차단의 "상호 비노출"은 매물 피드 노출과 새 지원서 제출까지만 막는다**: 이미 결제가 끝난 거래의 채팅까지 소급 차단하면 수령 조율(픽업 약속)이 끊긴다. 돈이 걸린 뒤에는 차단보다 거래 완결이 우선이라고 판단했다.
+- **blocks.blocked_nickname은 client가 아니라 `block_user()` SECURITY DEFINER 함수가 서버에서 조회해 저장한다**: 클라이언트가 임의 문자열을 넣을 수 없게 하고, 상대의 `public_profile_for_counterparty` 노출 범위(거래·지원 관계가 있어야 보임)와 무관하게 차단 자체는 UUID만으로 가능하게 하기 위해서다. 나중에 상대가 탈퇴해도 "내가 누구를 차단했는지"는 차단 시점 닉네임으로 남는다.
+- **실제 버그를 하나 잡았다 — RLS 정책 안에서 다른 RLS 테이블을 직접 서브쿼리로 참조하면 그 서브쿼리도 호출자 기준 RLS를 적용받는다.** `items_select_public`이 `blocks`를 직접 참조했는데, `blocks_select_own`(blocker_id = auth.uid()) 때문에 "내가 차단한" 관계만 보이고 "나를 차단한" 관계는 그 서브쿼리 안에서 보이지 않아 차단이 한쪽 방향으로만 걸렸다. `scripts/verify-stage3.mjs`의 상호 비노출 테스트가 실제로 이 비대칭을 잡아냈다 — 이 저장소가 이미 같은 이유로 `is_withdraw_restricted()`를 SECURITY DEFINER로 만들어둔 선례가 있었는데도 처음엔 놓쳤다. `is_blocked_pair()`/`is_applicant_blocked_from_item()`을 SECURITY DEFINER로 추가해 고쳤다(`supabase/migrations/20260928000300_block_enforcement_fix.sql`).
+- **설정 화면은 4번째 탭이 아니라 거래 탭 헤더의 텍스트 링크**: PROJECT.md §5 "탭바 3종 + 뒤로가기 + 상태 체크 외 아이콘 금지" 규칙과 충돌하지 않으려면 새 아이콘도, 새 탭도 안 된다 — 텍스트 링크는 "위계는 굵기·자간으로만"이라는 같은 절의 원칙과도 맞는다.
+- **계정 삭제 확인 시트는 MoneySheet(돈 레지스터)를 그대로 쓴다**: billing_keys 삭제를 포함하는 되돌릴 수 없는 결정이라 §5의 "수락 확인" 같은 무게가 맞다. 신고·차단 시트는 돈이 아니라 새로 만든 자체 시트(§5 2-레지스터 위반 방지).
+- **카카오 로컬 API 키는 새로 발급받지 않고 기존 OAuth REST API 키를 재사용한다**: 카카오는 앱 하나의 REST API 키로 로그인과 로컬 API를 겸한다. 서버 전용(`apps/web/.env`의 `KAKAO_REST_API_KEY`)으로만 두고 모바일 번들에는 넣지 않았다 — 이 저장소의 다른 모든 서드파티 키(TOSS_SECRET_KEY 등)와 같은 원칙.
+- **온보딩 동네 검색은 API 실패 시 "직접 입력한 값 그대로 쓰기" 폴백을 넣었다**: 실제로 `KAKAO_REST_API_KEY`가 아직 플레이스홀더(`placeholder_client_id`)라 로컬 API 호출이 401로 막히는 걸 직접 확인했다 — 이 상태에서 검색 결과가 하나도 안 나오면 온보딩 3단계가 막혀 앱을 아예 못 쓰게 될 뻔했다. 실 키가 없어도 온보딩은 끝낼 수 있어야 한다고 판단해 폴백을 추가했다.
+- **verify-stage3.mjs를 pnpm e2e와 별도 스크립트로 뒀다**: 계정 삭제 테스트가 매번 새 throwaway 계정을 만들고 실제로 소프트 삭제(로그인 수단 무효화)시키는데, pnpm e2e는 고정된 seller/buyer/outsider 계정을 재사용하는 구조라 같은 스크립트에 섞으면 그 계정들이 이후 실행에서 로그인 불가능해진다.
