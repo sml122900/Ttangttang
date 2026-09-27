@@ -43,7 +43,32 @@
     결제 취소 보상, `payment_incidents` 기록, 카드 등록 1회용 세션(`billing_auth_sessions`).
   - Supabase CLI는 dev 프로젝트에 link됨. 무료 플랜이라 7일 무활동이면 일시정지된다(대시보드에서 복구).
   - 남은 것: 실기기 1회 E2E(카드등록→지원→수락→결제 승인→토스 결제창 인앱 복귀→확정) 통과 확인.
-- **Phase 4 (신뢰 루프)**, **Phase 5 (출시)** — 미착수.
+  - (2026-09-28) 설정 화면, 계정 삭제(소프트 삭제 — `docs/decisions.md` 3단계 참고), 신고·차단
+    (상호 비노출), 온보딩 3장(닉네임·동네, 카카오 로컬 API) 추가. `pnpm verify:stage3`로 검증.
+    **카카오 키가 아직 플레이스홀더**(`placeholder_client_id`)라 카카오 로그인·동네 자동설정
+    모두 실 키 발급 전까지 동작하지 않는다(§0과 무관, 실 키만 필요) — 온보딩은 직접입력 폴백으로
+    막히지 않게 해뒀다.
+- **Phase 4 (신뢰 루프)** — 코드 완료(2026-09-28), `pnpm verify:stage4`로 검증. 실기기 미검증.
+  - 사진 실업로드(Storage, 본인 폴더 제한) + 사진 1장으로 제목·설명·시작가 제안하는 AI 등록
+    어시스트(`apps/web/lib/ai-assist.ts`, Claude API, 서버 전용). **ANTHROPIC_API_KEY 미설정 —
+    성공 경로 미검증, 실패 시 수동입력 폴백 경로만 검증됨.**
+  - 등록 화면 수령시한 입력(24/48/72시간) → accept 시 하드코딩 24시간 대신 이 값을 쓴다.
+  - 수령 확인(채팅 화면 배너, 구매자+판매자 이중 체크) → 완료 시 `items.status`도 `completed`로
+    전이(기존에 빠져 있던 버그 발견·수정).
+  - 노쇼 cron + 수령률/거래횟수 재계산 + 푸시 알림 5종 — 전부 apps/web을 거치지 않고 DB가
+    직접 처리한다: pg_cron이 10분마다 `run_scheduled_jobs()`를 돌리고, 그 안에서 pg_net으로
+    Expo 푸시 API를 직접 호출한다(`supabase/migrations/20260929000500_notifications.sql`).
+    푸시는 발사-후-망각(best-effort) — Expo 수신 확인은 안 한다.
+  - settings/payment 카드 관리(등록된 카드사·마스킹 번호 표시, 변경/삭제) — Toss 응답의 카드
+    필드명을 실카드로 검증하지 못해 방어적으로 여러 필드명을 시도한다(`apps/web/lib/payments/toss.ts`
+    주석 참고, 미검증).
+  - 매물 수정·삭제(취소) — 시작가만 등록 후 불변(트리거로 DB에서도 강제).
+  - **발견한 기존 스키마 제약**: `transactions.item_id`가 UNIQUE라 매물 하나당 거래는 평생 한 번뿐이다
+    — 노쇼가 나도 같은 매물 행으로는 재판매가 안 된다(새 매물을 다시 올려야 함). Phase 1부터 있던
+    제약이라 이번에 고치지 않았다, `docs/launch-audit.md`에 기록.
+  - 실기기에서만 확인 가능한 것: 푸시 실제 수신(Expo Go는 SDK 53부터 원격 푸시 미지원 — 개발
+    빌드/EAS 빌드 필요), 위치 권한 플로우, 사진 피커, AI 어시스트 성공 경로(키 필요).
+- **Phase 5 (출시)** — 미착수.
 
 일자별 작업 기록은 `docs/daily/`, 기술적 의사결정은 `docs/decisions/`, 트러블슈팅은
 `docs/troubleshooting/`, 이력서용 PAR 소재는 `docs/par-materials.md`에 있다.
