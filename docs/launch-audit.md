@@ -278,6 +278,13 @@ DB 쪽 원자성(철회 레이스, 중복 낙찰 차단, NULL-safe 판매자 확
 | 4 — 신뢰 루프 | 푸시 알림 5종 (지원도착·낙찰·거절·수령임박·노쇼정산) | ✅(코드) / ⏳(실수신) | pg_net으로 Expo 푸시 API 직접 호출, best-effort. `verify:stage4`는 DB 장부(sent_at)만 검증 — 실제 기기 수신은 실기기 확인 필요 |
 | 4 — 신뢰 루프 | settings/payment 카드 관리(카드사·마스킹 번호, 변경/삭제) | ✅(코드) / ⏳(표시 정확성) | Toss 카드 필드명 미검증(주석 참고) — 정보 없이도 등록/삭제는 정상 동작 |
 | 4 — 신뢰 루프 | 매물 수정·삭제 | ✅ | `verify:stage4` 1·4단계. 시작가 불변 트리거, 취소 시 대기 지원서 자동 거절 |
+| 6 — 출시 자산 | 앱 아이콘·어댑티브 아이콘·스플래시 | ✅ | `scripts/gen-icons.mjs` — 브랜드 블루 + AwardStamp 시각 언어 재사용. iOS Icon Composer 번들(`assets/expo.icon/`)은 그대로 둠(iOS는 §7 후속) |
+| 6 — 출시 자산 | 피처 그래픽(1024×500) | ✅ | `docs/store-assets/feature-graphic.png` |
+| 6 — 출시 자산 | 스크린샷 5장 | ⚠️ 목업 | `docs/store-assets/mockup-screenshots/` — 실기기 캡처 아님, 실제 컴포넌트 코드 기반 정확한 목업. `expo start --web`으로 실제 캡처 시도했으나 NativeWind/react-native-web 런타임 에러로 막힘(§ 새로 발견한 리스크). `docs/phone-check.md` 완료 후 반드시 실제 스크린샷으로 교체 — 목업인 채 제출 금지(Play 오인 유발 콘텐츠 정책) |
+| 6 — 출시 자산 | 스토어 설명문·데이터 보안 양식·정책 선언 | ✅(초안) | `docs/store-listing.md` — 연락처 이메일·IARC 설문 실제 값은 사용자가 Play Console에서 채워야 함 |
+| 6 — 출시 자산 | README 케이스 스터디 + 아키텍처 다이어그램 | ✅ | 루트 `README.md`. 문제정의·경매→지원서 전환 이유·수락 원자성/보상 트랜잭션·RLS 버그 2건·클라우드+터널 전환·mermaid 다이어그램 |
+| 6 — 출시 자산 | 랜딩 페이지 시연 GIF 자리 | ✅(자리만) | `apps/web/app/page.tsx` — 실제 GIF는 `docs/phone-check.md` 이후 촬영 |
+| 6 — 출시 자산 | `docs/phone-check.md` | ✅ | 이 세션 전체에서 "코드 완료·실기기 미검증"으로 남은 항목을 전부 모음 |
 
 ### 새로 발견한 리스크
 - **dev Supabase 프로젝트가 무료 플랜 무활동으로 일시정지됐었다** (2026-09-27 사용자 복구). 7일 무활동이면
@@ -338,3 +345,13 @@ DB 쪽 원자성(철회 레이스, 중복 낙찰 차단, NULL-safe 판매자 확
   처리방침에 빨간 표시로 남겼다** — 스토어 제출 전 Anthropic 개발자 문서에서 확인해 채울 것.
   "사진 = 제3자 공유"로 볼지(서비스 제공업체 예외 적용 가능성)는 Play 정책 재확인이 필요하다고
   `docs/store-listing.md`에 각주로 남겼다.
+- **`expo start --web`이 런타임 에러로 안 뜬다(2026-09-30 발견)**: 실기기 스크린샷 대신 웹
+  렌더링을 캡처해보려다 발견 — NativeWind/react-native-web 조합에서 "Cannot manually set...
+  StyleSheet.setFlag(...)" 에러가 난다. `app.json`이 web을 선언하고 있지만 이 조합이 실제로
+  실행되는 걸 이번에 처음 시도해본 것으로 보인다. Android 출시가 우선이라(§0과 무관) 이번
+  범위에서 고치지 않고 `docs/phone-check.md`에 알려진 이슈로만 남겼다 — 나중에 웹 프리뷰가
+  필요해지면 원인을 다시 파야 한다.
+- **스크린샷 5장이 아직 목업이다**: 위 이슈 때문에 실기기 캡처를 대체할 방법이 없어, 실제
+  컴포넌트 코드 기반 목업으로 채웠다. `docs/phone-check.md`를 통과하기 전까지는 스토어
+  제출 자체가 안 된다는 뜻이다(Play는 실제 앱과 다른 스크린샷을 오인 유발 콘텐츠로 반려할
+  수 있다) — 우선순위 목록에 명시적으로 올려둔다.
