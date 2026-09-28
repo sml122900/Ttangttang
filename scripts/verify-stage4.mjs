@@ -550,9 +550,10 @@ async function main() {
       return { status: res.status, json };
     }
 
-    await step("8. [AI 어시스트] 실제 중고 물건 사진(의자) → 200 + title/description/startPrice 파싱", async () => {
+    await step("8. [AI 어시스트] 실제 중고 물건 사진(의자) → isItem:true + title/description/startPrice 파싱", async () => {
       const { status, json } = await callAiAssist("item-chair.jpg", "image/jpeg");
       assertEq(status, 200, `status (${JSON.stringify(json)})`);
+      assertEq(json.isItem, true, "isItem");
       assert(typeof json.title === "string" && json.title.length > 0, "title이 비어있어요");
       assert(typeof json.description === "string" && json.description.length > 0, "description이 비어있어요");
       assert([1000, 3000, 5000].includes(json.startPrice), `startPrice가 3택이 아니에요: ${json.startPrice}`);
@@ -561,20 +562,24 @@ async function main() {
       log(`  - startPrice: ${json.startPrice}`);
     });
 
+    // 2026-09-30: is_item 필드 도입 전에는 이 세 케이스도 title/description에 거절 문구가
+    // 그대로 채워져, 사용자가 그대로 등록하면 그 문장이 매물 제목이 되는 문제가 있었다.
+    // 이제는 isItem:false로 명확히 분기되는지, title/description/startPrice는 채워지지
+    // 않는지(=폼에 잘못 반영될 데이터 자체가 없는지)를 확인한다.
     for (const [label, file, contentType] of [
       ["글씨만 있는 이미지", "text-only.png", "image/png"],
       ["사람 얼굴 사진", "face.jpg", "image/jpeg"],
       ["완전히 무관한 사진(노을)", "irrelevant.jpg", "image/jpeg"],
     ]) {
-      await step(`8. [AI 어시스트] 이상한 사진 — ${label} → 강제 tool-use라도 형태는 항상 유효해야 함`, async () => {
+      await step(`8. [AI 어시스트] 이상한 사진 — ${label} → isItem:false, 폼에 채울 데이터 없음`, async () => {
         const { status, json } = await callAiAssist(file, contentType);
         assertEq(status, 200, `status (${JSON.stringify(json)})`);
-        assert(typeof json.title === "string" && json.title.length > 0, "title이 비어있어요");
-        assert(typeof json.description === "string" && json.description.length > 0, "description이 비어있어요");
-        assert([1000, 3000, 5000].includes(json.startPrice), `startPrice가 3택이 아니에요: ${json.startPrice}`);
-        log(`  - title: ${json.title}`);
-        log(`  - description: ${json.description}`);
-        log(`  - startPrice: ${json.startPrice}`);
+        assertEq(json.isItem, false, "isItem");
+        assert(typeof json.rejectReason === "string" && json.rejectReason.length > 0, "rejectReason이 비어있어요");
+        assertEq(json.title, undefined, "title (isItem:false면 없어야 함)");
+        assertEq(json.description, undefined, "description (isItem:false면 없어야 함)");
+        assertEq(json.startPrice, undefined, "startPrice (isItem:false면 없어야 함)");
+        log(`  - rejectReason: ${json.rejectReason}`);
       });
     }
 

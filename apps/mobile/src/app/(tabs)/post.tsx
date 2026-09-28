@@ -24,6 +24,7 @@ export default function PostScreen() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [aiSuggested, setAiSuggested] = useState(false);
+  const [aiRejectReason, setAiRejectReason] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   function updatePickupSlot(index: number, value: string) {
@@ -53,26 +54,32 @@ export default function PostScreen() {
   }
 
   // 4단계 — 사진을 고르면 곧바로 업로드하고, 업로드된 사진으로 AI 등록 어시스트를 시도한다.
-  // 실패(키 미설정, 네트워크 오류 등)해도 조용히 넘어간다 — 사진은 이미 올라갔고, 나머지
-  // 칸은 그냥 비워둔 채로 수동 입력을 계속하면 된다.
+  // 네트워크 실패 등은 조용히 폴백(에러 문구 없음, 사진은 이미 올라갔으니 나머지 칸을 직접
+  // 채우면 된다). "이 사진은 물건이 아니다"(isItem:false)는 실패가 아니라 정상 응답이라
+  // 별도로 안내하고, 폼 칸은 채우지 않는다 — 그 자리에 채울 문구 자체가 없다(2026-09-30).
   async function handlePickPhoto() {
     try {
       const uri = await pickPhoto();
       if (!uri) return;
       setPhotoUri(uri);
       setAiSuggested(false);
+      setAiRejectReason(null);
       setUploadingPhoto(true);
       const url = await uploadItemPhoto(session!.user.id, uri);
       setPhotoUrl(url);
 
       try {
         const suggestion = await requestListingSuggestion(session!.access_token, url);
-        setTitle(suggestion.title);
-        setDescription(suggestion.description);
-        setStartPrice(suggestion.startPrice);
-        setAiSuggested(true);
+        if (suggestion.isItem) {
+          setTitle(suggestion.title);
+          setDescription(suggestion.description);
+          setStartPrice(suggestion.startPrice);
+          setAiSuggested(true);
+        } else {
+          setAiRejectReason(suggestion.rejectReason);
+        }
       } catch {
-        // AI 제안 실패 — 수동 입력으로 자연스럽게 폴백 (에러 문구 없음).
+        // 진짜 실패(키 미설정·네트워크 오류 등) — 수동 입력으로 자연스럽게 폴백.
       }
     } catch (err) {
       Alert.alert("사진을 불러오지 못했어요", err instanceof Error ? err.message : String(err));
@@ -119,6 +126,7 @@ export default function PostScreen() {
       setPhotoUri(null);
       setPhotoUrl(null);
       setAiSuggested(false);
+      setAiRejectReason(null);
       router.replace("/");
     } catch (err) {
       Alert.alert("등록에 실패했어요", err instanceof Error ? err.message : String(err));
@@ -155,10 +163,21 @@ export default function PostScreen() {
             </>
           )}
         </Pressable>
+        <Text className="mt-2 text-[11px] leading-relaxed text-sub-2">
+          사진이 AI 분석을 위해 외부로 전송돼요
+        </Text>
         {aiSuggested && (
-          <Text className="mt-2 text-[11.5px] font-medium text-brand">
+          <Text className="mt-1.5 text-[11.5px] font-medium text-brand">
             AI가 사진을 보고 아래 칸을 채웠어요 — 확인하고 고쳐주세요
           </Text>
+        )}
+        {aiRejectReason && (
+          <View className="mt-1.5 rounded-xl bg-[#F9FAFB] px-3.5 py-3">
+            <Text className="text-[12.5px] leading-relaxed text-sub">
+              AI가 이 사진에서 물건을 확인하지 못했어요 ({aiRejectReason}). 다른 사진으로
+              다시 올리거나, 아래 칸을 직접 채워 등록을 계속할 수 있어요.
+            </Text>
+          </View>
         )}
 
         <Text className="mb-2 mt-5 text-[13.5px] font-semibold text-sub">물건 이름</Text>
