@@ -61,3 +61,9 @@
 - **Toss 카드 정보 필드명을 추측으로 여러 개 시도한다**: 테스트 키로는 카드 등록 자체가 막혀 실제 응답 스키마를 볼 수 없었다(7/31 이미 겪은 문제, `toss-billing-no-dedicated-test-card.md`). 틀려도 두 컬럼 다 nullable이라 카드 등록/결제 자체에는 영향이 없어, 확정 대신 방어적 다중 시도 + 주석으로 남기는 쪽을 택했다.
 - **AI 어시스트는 Bearer 인증을 요구한다**: 매 호출이 Claude API 비용이라 익명 남용을 막아야 했다. imageUrl도 우리 Storage 버킷 접두사인지 검사한다 — 아니면 서버가 임의 URL을 그대로 fetch하는 SSRF 통로가 된다.
 - **verify-stage4.mjs도 pnpm e2e/verify:stage3와 별도 스크립트로 뒀다**: 매번 새 throwaway 계정을 만들고 Storage에 실제 파일을 올리는 등 부수효과가 있어, 고정 계정을 재사용하는 e2e와 섞으면 안 된다는 같은 이유.
+
+## 4단계 후속 — AI 어시스트 실 API 검증 (2026-09-29)
+- **테스트 이미지는 합성이 아니라 실제 사진을 쓴다(의자·얼굴)**: "물건이 맞는지/아닌지"를 실제로 가늠하는 게 검증 목적이라, 벡터 일러스트로는 진짜 사진에 대한 모델 반응을 확인했다고 보기 어렵다고 판단했다. Wikimedia Commons(CC BY/BY-SA)에서 480px로 축소해 `scripts/fixtures/ai-assist/`에 커밋하고 출처를 README에 남겼다. 텍스트 이미지는 "이 실패 모드를 재현하는 것 자체가 목적"이라 합성(SVG→PNG)으로 충분하다고 봤다.
+- **"이상한 사진" 케이스의 자동 검증은 형태 계약까지만 한다**: `tool_choice`를 강제해도 모델이 실제로 어떤 문구를 내는지는 자연어라 모델 버전이 바뀌면 흔들릴 수 있다. 자동 assert는 "200 + title/description이 비어있지 않음 + startPrice가 3택 중 하나"까지만 걸고, 실제 문구는 매번 로그로 남겨 사람이 훑어보게 했다 — 이번 실행에서 실제로 읽고 "모델이 적절히 처리했다"고 판단한 근거는 `docs/launch-audit.md`에 실제 응답을 그대로 남겼다.
+- **Claude 타임아웃 재현을 위해 apps/web을 동시에 두 인스턴스 띄운다**: Next.js 16 dev 서버는 같은 `distDir`(기본 `.next`) 안에 락 파일을 둬서 같은 디렉터리에서 두 번째 `next dev`를 거부한다. `next.config.ts`에 `NEXT_DIST_DIR` 환경변수로 `distDir`를 바꿀 수 있게 해서, 타임아웃 재현 전용 인스턴스만 별도 `.next-verify-stage4-timeout`을 쓰게 했다. 운영/일반 개발에는 영향 없다(env 미설정 시 기본값 `.next` 그대로).
+- **Claude API에도 Toss와 같은 `*_API_BASE`/`*_TIMEOUT_MS` 오버라이드 패턴을 그대로 적용했다**: `ANTHROPIC_API_BASE`/`ANTHROPIC_TIMEOUT_MS`(기본 25초, route의 `maxDuration=30`보다 짧게) + `maxRetries: 0`(재시도가 끼면 타임아웃 테스트가 길어짐). `scripts/lib/mock-anthropic.mjs`는 요청을 영원히 안 받아주는 것 하나만 한다 — 성공/이상한 사진 케이스는 모킹하면 검증 의미가 없어 항상 진짜 API로 돌린다.

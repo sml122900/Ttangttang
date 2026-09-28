@@ -7,8 +7,15 @@
 
 import { spawn, execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { startMockToss } from "./lib/mock-toss.mjs";
+import { startMockAnthropic } from "./lib/mock-anthropic.mjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURES_DIR = path.join(__dirname, "fixtures", "ai-assist");
 
 function loadEnv() {
   const required = ["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
@@ -20,6 +27,8 @@ function loadEnv() {
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     webPort: Number(process.env.E2E_WEB_PORT || 3102),
     mockPort: Number(process.env.E2E_MOCK_TOSS_PORT || 4547),
+    webTimeoutPort: Number(process.env.E2E_WEB_TIMEOUT_PORT || 3103),
+    mockAnthropicPort: Number(process.env.E2E_MOCK_ANTHROPIC_PORT || 4548),
   };
 }
 
@@ -109,17 +118,39 @@ async function main() {
   const storagePaths = [];
 
   const mock = await startMockToss(env.mockPort);
+  const mockAnthropic = await startMockAnthropic(env.mockAnthropicPort);
   const web = startWebServer({
     port: env.webPort,
     env: {
       TOSS_API_BASE: mock.base,
       TOSS_TIMEOUT_MS: "1500",
       TOSS_SECRET_KEY: "test_sk_verify_stage4_mock_never_sent_to_toss",
+      // ANTHROPIC_API_KEY는 일부러 안 넣는다 — apps/web/.env에 있는 진짜 키를 Next.js가
+      // 그대로 로드하게 둔다(§8 실사진 AI 어시스트 검증용). 타임아웃 경로만 아래 별도
+      // 서버(webTimeout)로 분리한다.
+    },
+  });
+  // Claude 타임아웃 재현 전용 — 이 서버만 ANTHROPIC_API_BASE를 모의 서버로 돌린다.
+  const webTimeoutOrigin = `http://localhost:${env.webTimeoutPort}`;
+  const webTimeout = startWebServer({
+    port: env.webTimeoutPort,
+    env: {
+      TOSS_API_BASE: mock.base,
+      TOSS_TIMEOUT_MS: "1500",
+      TOSS_SECRET_KEY: "test_sk_verify_stage4_mock_never_sent_to_toss",
+      ANTHROPIC_API_KEY: "sk-ant-mock-not-actually-used",
+      ANTHROPIC_API_BASE: mockAnthropic.base,
+      ANTHROPIC_TIMEOUT_MS: "1500",
+      // 같은 apps/web을 동시에 두 인스턴스 띄우는 것이라 distDir(dev 서버 락 파일 위치)을
+      // 분리해야 한다 — apps/web/next.config.ts 주석 참고.
+      NEXT_DIST_DIR: ".next-verify-stage4-timeout",
     },
   });
 
   try {
-    await step("0. apps/web 개발 서버 기동", () => waitForWeb(origin));
+    await step("0. apps/web 개발 서버 기동 (기본 + 타임아웃 재현용)", () =>
+      Promise.all([waitForWeb(origin), waitForWeb(webTimeoutOrigin)]),
+    );
 
     async function freshUser(label) {
       const email = `verify4-${label}-${randomUUID().slice(0, 8)}@ttangttang.test`;
@@ -468,33 +499,98 @@ async function main() {
       assertEq(res.status, 400, "status");
     });
 
-    await step(
-      "8. [AI 어시스트] 정상 인증 + 우리 버킷 이미지 → ANTHROPIC_API_KEY 미설정으로 502(수동입력 폴백 경로)",
-      async () => {
-        const res = await fetch(`${origin}/api/items/ai-assist`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${buyer.accessToken}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl: publicUrlData.publicUrl }),
-        });
-        const json = await res.json();
-        // ANTHROPIC_API_KEY가 이 환경에 없다 — 502로 실패하는 것 자체가 "AI 실패 → 수동입력
-        // 폴백" 계약이 지켜진다는 뜻이다. 키가 있는 환경에서는 200을 기대한다(수동 확인 필요,
-        // docs/launch-audit.md에 기록).
-        assertEq(res.status, 502, `status (${JSON.stringify(json)})`);
-        log(`  - (키 미설정) 502로 폴백 확인: ${json.error}`);
-      },
-    );
+    await step("8. [AI 어시스트] 우리 버킷의 존재하지 않는 파일 → 502 (이미지 페치 실패 폴백)", async () => {
+      const missingUrl = publicUrlData.publicUrl.replace(/[^/]+$/, `does-not-exist-${Date.now()}.png`);
+      const res = await fetch(`${origin}/api/items/ai-assist`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${buyer.accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: missingUrl }),
+      });
+      const json = await res.json();
+      assertEq(res.status, 502, `status (${JSON.stringify(json)})`);
+      log(`  - 이미지 페치 실패 → 502 폴백 확인: ${json.error}`);
+    });
+
+    await step("8. [AI 어시스트] Claude 타임아웃(모의 서버, 1.5s로 끊음) → 502 (폴백)", async () => {
+      const started = Date.now();
+      const res = await fetch(`${webTimeoutOrigin}/api/items/ai-assist`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${buyer.accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: publicUrlData.publicUrl }),
+      });
+      const json = await res.json();
+      const ms = Date.now() - started;
+      assertEq(res.status, 502, `status (${JSON.stringify(json)})`);
+      assert(ms >= 1400 && ms < 15_000, `타임아웃(1.5s) 근처에서 끊겼어야 해요: ${ms}ms`);
+      log(`  - ${ms}ms 후 타임아웃 → 502 폴백 확인: ${json.error}`);
+    });
+
+    // 실제 Claude API 호출 — 2026-09-29 사용자 요청으로 실카드가 아니라 실 API 키를 넣고
+    // 검증했다. 자동 검증은 "형태 계약"(200, title/description 비어있지 않음, startPrice가
+    // 1000/3000/5000 중 하나)까지만 한다 — tool_choice가 강제(type:"tool")라 모델이 호출
+    // 자체를 거부할 수는 없지만, 실제로 적절한 문구를 냈는지는 모델 버전이 바뀔 때마다 달라질
+    // 수 있는 자연어라 자동 assert 대상으로 삼지 않는다. 대신 실제 응답을 전부 로그로 남겨
+    // 사람이 훑어볼 수 있게 한다 — 이번 실행에서 직접 읽고 판단한 결과는 대화 내역/보고에 남긴다.
+    async function callAiAssist(fixtureFile, contentType) {
+      const bytes = readFileSync(path.join(FIXTURES_DIR, fixtureFile));
+      const uploadPath = `${buyer.userId}/verify4-ai-${fixtureFile}-${Date.now()}`;
+      storagePaths.push(uploadPath);
+      const { error: uploadError } = await buyer.client.storage
+        .from("item-photos")
+        .upload(uploadPath, bytes, { contentType });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = buyer.client.storage.from("item-photos").getPublicUrl(uploadPath);
+
+      const res = await fetch(`${origin}/api/items/ai-assist`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${buyer.accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: urlData.publicUrl }),
+      });
+      const json = await res.json();
+      return { status: res.status, json };
+    }
+
+    await step("8. [AI 어시스트] 실제 중고 물건 사진(의자) → 200 + title/description/startPrice 파싱", async () => {
+      const { status, json } = await callAiAssist("item-chair.jpg", "image/jpeg");
+      assertEq(status, 200, `status (${JSON.stringify(json)})`);
+      assert(typeof json.title === "string" && json.title.length > 0, "title이 비어있어요");
+      assert(typeof json.description === "string" && json.description.length > 0, "description이 비어있어요");
+      assert([1000, 3000, 5000].includes(json.startPrice), `startPrice가 3택이 아니에요: ${json.startPrice}`);
+      log(`  - title: ${json.title}`);
+      log(`  - description: ${json.description}`);
+      log(`  - startPrice: ${json.startPrice}`);
+    });
+
+    for (const [label, file, contentType] of [
+      ["글씨만 있는 이미지", "text-only.png", "image/png"],
+      ["사람 얼굴 사진", "face.jpg", "image/jpeg"],
+      ["완전히 무관한 사진(노을)", "irrelevant.jpg", "image/jpeg"],
+    ]) {
+      await step(`8. [AI 어시스트] 이상한 사진 — ${label} → 강제 tool-use라도 형태는 항상 유효해야 함`, async () => {
+        const { status, json } = await callAiAssist(file, contentType);
+        assertEq(status, 200, `status (${JSON.stringify(json)})`);
+        assert(typeof json.title === "string" && json.title.length > 0, "title이 비어있어요");
+        assert(typeof json.description === "string" && json.description.length > 0, "description이 비어있어요");
+        assert([1000, 3000, 5000].includes(json.startPrice), `startPrice가 3택이 아니에요: ${json.startPrice}`);
+        log(`  - title: ${json.title}`);
+        log(`  - description: ${json.description}`);
+        log(`  - startPrice: ${json.startPrice}`);
+      });
+    }
 
     log(`\n모든 단계 통과 (${passed}개).`);
   } catch (err) {
     console.error(`\n실패 지점: ${currentStep}`);
     console.error(err instanceof Error ? err.stack ?? err.message : err);
     console.error(`\n--- apps/web 로그 (마지막 80줄) ---\n${web.tail.join("\n")}`);
+    console.error(`\n--- apps/web(타임아웃 서버) 로그 (마지막 80줄) ---\n${webTimeout.tail.join("\n")}`);
     process.exitCode = 1;
   } finally {
     await cleanup(admin, createdItemIds, cleanupUserIds, storagePaths).catch((e) => console.error("정리 실패:", e.message));
     web.stop();
+    webTimeout.stop();
     await mock.close();
+    await mockAnthropic.close();
   }
 }
 

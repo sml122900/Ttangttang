@@ -44,12 +44,25 @@ export interface ListingSuggestion {
   startPrice: 1000 | 3000 | 5000;
 }
 
+// ANTHROPIC_API_BASE/ANTHROPIC_TIMEOUT_MS는 scripts/verify-stage4.mjs가 모의 Anthropic
+// 서버로 타임아웃 경로를 재현할 때만 쓴다 (apps/web/lib/payments/toss.ts의 TOSS_API_BASE/
+// TOSS_TIMEOUT_MS와 같은 패턴). 운영 환경에서는 비워둔다.
+function timeoutMs(): number {
+  const n = Number(process.env.ANTHROPIC_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 25_000; // route의 maxDuration(30s) 안에서 여유를 두고 끊는다.
+}
+
 function client(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not set (server-only env, see apps/web/.env.example)");
   }
-  return new Anthropic({ apiKey });
+  return new Anthropic({
+    apiKey,
+    baseURL: process.env.ANTHROPIC_API_BASE || undefined,
+    timeout: timeoutMs(),
+    maxRetries: 0, // 재시도가 끼면 "타임아웃 경로가 실제로 502까지 이어지는지" 테스트 타이밍이 늘어진다.
+  });
 }
 
 function isValidStartPrice(value: unknown): value is 1000 | 3000 | 5000 {
