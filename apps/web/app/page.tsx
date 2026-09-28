@@ -39,6 +39,17 @@ export default function Home() {
           봉은 판매자가 두드린다. 찜하고 잠수, 노쇼, 유세 없는 동네 나눔·소액거래.
         </p>
 
+        {/* 시연 GIF 자리 — 등록→지원→땅땅 더블 노크까지 이어지는 화면 녹화를 여기 넣는다
+            (6단계, docs/store-listing.md 남은 항목). 실기기 확인(docs/phone-check.md)이
+            끝난 뒤 촬영해 /public에 추가하고 이 블록을 <img>/<video>로 교체할 것. */}
+        <div className="mt-10 flex aspect-[9/16] w-full max-w-[280px] items-center justify-center rounded-[32px] border border-dashed border-line bg-[#F9FAFB]">
+          <span className="px-6 text-center text-[13px] leading-relaxed text-sub-2">
+            시연 GIF 자리
+            <br />
+            (등록 → 지원 → 땅땅 확정)
+          </span>
+        </div>
+
         <ol className="mt-14 flex flex-col gap-8">
           {RULES.map((r) => (
             <li key={r.n} className="flex gap-4">
