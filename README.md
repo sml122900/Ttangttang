@@ -97,7 +97,7 @@ v1은 "구매자들의 결제 경쟁"이 임계 구간이라 락 선점 같은 �
 **2026-09-27 — 출시 감사 → 1단계 보강**: 결제 체인의 보상 처리가 비어 있던 것(P1/P2/P5) —
 위 "수락 원자성과 보상 트랜잭션" 참고.
 
-**2026-09-28 — 3단계(신고·차단)**: RLS 서브쿼리가 caller의 RLS를 그대로 상속받는 버그 2건
+**2026-09-28 — 3단계(신고·차단)**: RLS 서브쿼리가 caller의 RLS를 그대로 상속받는 버그
 (아래 상세).
 
 **2026-09-29 — 4단계(수령 확인)**: `item_status` enum에 `completed` 값이 있는데 그 값으로
@@ -105,30 +105,32 @@ v1은 "구매자들의 결제 경쟁"이 임계 구간이라 락 선점 같은 �
 `confirm_pickup()`이 트랜잭션을 완료 처리하는 바로 그 순간에 같이 고쳤다
 (`supabase/migrations/20260929000700_items_completed_on_pickup.sql`).
 
-### RLS 버그 2건 (3단계 상세)
+### RLS 버그 (3단계 상세)
 
-3단계(신고·차단)에서 "차단하면 서로의 매물이 안 보인다"는 상호 비노출을 구현하다가, 같은
-근본 원인의 버그를 두 번 마주쳤다.
+3단계(신고·차단)에서 "차단하면 서로의 매물이 안 보인다"는 상호 비노출을 구현하다가 실제로
+테스트가 잡아낸 버그는 하나다: **`items_select_public`이 `blocks`를 직접 서브쿼리로
+참조**했다. bob이 alice를 차단하면, alice가 items를 조회할 때 그 정책 안의 `blocks`
+서브쿼리도 **alice 자신의 RLS**(`blocks_select_own`: `blocker_id = auth.uid()`)를 그대로
+적용받는다. bob이 만든 차단 행은 `blocker_id = bob`이라 alice의 시점에서는 그 서브쿼리 안에서
+아예 안 보인다 — 결과적으로 차단이 **bob→alice 방향으로만** 걸리고 alice→bob 방향은 뚫려
+있었다. `scripts/verify-stage3.mjs`의 상호 비노출 테스트가 이 비대칭을 직접 잡아냈다.
+SECURITY DEFINER 함수 `is_blocked_pair()`로 고쳤다(이 저장소는 이미 `is_withdraw_restricted()`를
+같은 이유로 SECURITY DEFINER로 만들어둔 선례가 있었는데도 처음엔 놓쳤다).
 
-**1번 — `items_select_public`이 `blocks`를 직접 서브쿼리로 참조**: bob이 alice를 차단하면,
-alice가 items를 조회할 때 그 정책 안의 `blocks` 서브쿼리도 **alice 자신의 RLS**(`blocks_select_own`:
-`blocker_id = auth.uid()`)를 그대로 적용받는다. bob이 만든 차단 행은 `blocker_id = bob`이라
-alice의 시점에서는 그 서브쿼리 안에서 아예 안 보인다 — 결과적으로 차단이 **bob→alice
-방향으로만** 걸리고 alice→bob 방향은 뚫려 있었다. `scripts/verify-stage3.mjs`의 상호 비노출
-테스트가 이 비대칭을 직접 잡아냈다.
+이 수정을 커밋하기 전에 코드 리뷰 과정에서 **같은 원인이 `applications_insert_own`에도 한 겹
+더 있을 수 있다는 걸 미리 알아챘다** — 그 정책이 "item_id로 seller_id를 조회하는" 서브쿼리를
+`is_blocked_pair()`를 꽂은 뒤에도 여전히 caller 권한으로 돌리고 있었다. 이미 차단된 상태라
+그 매물 자체가 안 보이는 사용자가 옛 item_id로 직접 insert를 시도하면, seller_id 조회가
+NULL이 되어 차단 검사 자체가 조용히 우회될 수 있었다. **이건 테스트가 실패해서 발견한 게
+아니라, 첫 번째 버그를 고치며 "이 패턴이 또 있을 수 있다"는 걸 미리 의심하고 같은 커밋에서
+선제적으로 닫은 것**이다 — items 조회까지 통째로 SECURITY DEFINER 안에 넣는
+`is_applicant_blocked_from_item()`을 추가했고, 실제 테스트는 두 방어가 모두 들어간 최종본을
+한 번에 통과했다(`supabase/migrations/20260928000300_block_enforcement_fix.sql`, 커밋
+`1b6bcf0` 하나).
 
-**2번 — 같은 원인이 `applications_insert_own`에도 한 겹 더 있었다**: 1번을 SECURITY DEFINER
-함수(`is_blocked_pair`)로 고친 뒤, 지원 정책에도 같은 함수를 꽂았다고 안심했는데 — 그 정책이
-"item_id로 seller_id를 조회하는" 서브쿼리를 **여전히 caller 권한으로** 돌리고 있었다. 이미
-차단된 상태라 그 매물 자체가 안 보이는 사용자가 옛 item_id로 직접 insert를 시도하면, seller_id
-조회가 NULL이 되어 차단 검사 자체가 조용히 우회됐다. items 조회까지 통째로 SECURITY DEFINER
-안에 넣는 `is_applicant_blocked_from_item()`으로 다시 고쳤다.
-
-두 버그 모두 **"RLS 정책이 다른 RLS 테이블을 참조하면, 그 서브쿼리도 호출자의 RLS를 그대로
-적용받는다"**는 동일한 함정이었다 — 이 저장소는 이미 `is_withdraw_restricted()`를 같은
-이유로 SECURITY DEFINER로 만들어둔 선례가 있었는데도 처음엔 놓쳤다. 이후 `docs/decisions.md`에
-"RLS 정책 작성 시 체크리스트: 서브쿼리가 참조하는 테이블도 자기 RLS의 영향을 받는지 확인"을
-남겨 세 번째 반복을 막기로 했다.
+**"RLS 정책이 다른 RLS 테이블을 참조하면, 그 서브쿼리도 호출자의 RLS를 그대로 적용받는다"**가
+공통 함정이다. `docs/decisions.md`에 "RLS 정책 작성 시 체크리스트: 서브쿼리가 참조하는
+테이블도 자기 RLS의 영향을 받는지 확인"을 남겨 다음에 또 놓치지 않게 했다.
 
 ## 클라우드 백엔드 + 터널 기반 개발 환경 전환
 
