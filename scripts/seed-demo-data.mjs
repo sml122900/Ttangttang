@@ -21,13 +21,13 @@
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import {
-  DEMO_SELLER,
-  DEMO_BUYERS,
+  buildDemoSeller,
+  buildDemoBuyers,
   ensureDemoAccounts,
   wipeDemoTradeData,
 } from "./lib/demo-data.mjs";
 
-const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "DEMO_SELLER_PASSWORD"];
 
 function loadEnv() {
   const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
@@ -38,6 +38,7 @@ function loadEnv() {
   }
   return {
     supabaseUrl: process.env.SUPABASE_URL,
+    demoPassword: process.env.DEMO_SELLER_PASSWORD,
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   };
 }
@@ -80,8 +81,11 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  const DEMO_SELLER = buildDemoSeller(env.demoPassword);
+  const DEMO_BUYERS = buildDemoBuyers(env.demoPassword);
+
   console.log("▶ 데모 계정 준비");
-  const ids = await ensureDemoAccounts(admin);
+  const ids = await ensureDemoAccounts(admin, env.demoPassword);
   const sellerId = ids[DEMO_SELLER.email];
   const buyerA = ids[DEMO_BUYERS.a.email];
   const buyerB = ids[DEMO_BUYERS.b.email];

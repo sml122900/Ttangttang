@@ -6,47 +6,55 @@
 // 이 계정들에 연결돼 있으므로 제목에 별도 프리픽스를 달 필요가 없다 — 스크린샷에 "[데모]" 같은
 // 티가 안 난다.
 export const DEMO_EMAIL_DOMAIN = "ttangttang.demo";
-export const DEMO_PASSWORD = "ttangttang-demo-seed-2026";
 
-export const DEMO_SELLER = {
-  email: `seller@${DEMO_EMAIL_DOMAIN}`,
-  password: DEMO_PASSWORD,
-  nickname: "소소한정리",
-  neighborhood: "역삼동",
-};
+// 비밀번호는 scripts/.env의 DEMO_SELLER_PASSWORD에서만 읽는다 — 이 파일은 git에 커밋되므로
+// 실제 값을 하드코딩하지 않는다(예전에 한 번 실수로 커밋했다가 회전한 적 있음, docs/decisions.md 참고).
+export function buildDemoSeller(password) {
+  return {
+    email: `seller@${DEMO_EMAIL_DOMAIN}`,
+    password,
+    nickname: "소소한정리",
+    neighborhood: "역삼동",
+  };
+}
 
 // 셋 다 "featured" 매물(스탠드)에 지원한다 — 제시가·방문 슬롯·메시지·수령률을 일부러 다르게 줘서
 // "가장 비싼 제시가"가 아니라 신뢰도 높은 지원자가 선택되는 그림을 한 화면에서 보여준다.
-export const DEMO_BUYERS = {
-  a: {
-    email: `buyer-a@${DEMO_EMAIL_DOMAIN}`,
-    password: DEMO_PASSWORD,
-    nickname: "도윤맘",
-    neighborhood: "역삼동",
-    receiveRate: 100,
-  },
-  b: {
-    email: `buyer-b@${DEMO_EMAIL_DOMAIN}`,
-    password: DEMO_PASSWORD,
-    nickname: "저녁마실",
-    neighborhood: "청담동",
-    receiveRate: 78, // 일부러 낮춤 — "제일 비싸게 부른 사람"이 신뢰도는 제일 낮은 시나리오
-  },
-  c: {
-    email: `buyer-c@${DEMO_EMAIL_DOMAIN}`,
-    password: DEMO_PASSWORD,
-    nickname: "책벌레지수",
-    neighborhood: "잠실동",
-    receiveRate: 100,
-  },
-};
-
-export const ALL_DEMO_ACCOUNTS = [DEMO_SELLER, ...Object.values(DEMO_BUYERS)];
+export function buildDemoBuyers(password) {
+  return {
+    a: {
+      email: `buyer-a@${DEMO_EMAIL_DOMAIN}`,
+      password,
+      nickname: "도윤맘",
+      neighborhood: "역삼동",
+      receiveRate: 100,
+    },
+    b: {
+      email: `buyer-b@${DEMO_EMAIL_DOMAIN}`,
+      password,
+      nickname: "저녁마실",
+      neighborhood: "청담동",
+      receiveRate: 78, // 일부러 낮춤 — "제일 비싸게 부른 사람"이 신뢰도는 제일 낮은 시나리오
+    },
+    c: {
+      email: `buyer-c@${DEMO_EMAIL_DOMAIN}`,
+      password,
+      nickname: "책벌레지수",
+      neighborhood: "잠실동",
+      receiveRate: 100,
+    },
+  };
+}
 
 // ---------- 계정 준비 ----------
-export async function ensureDemoAccounts(admin) {
+export async function ensureDemoAccounts(admin, password) {
+  if (!password) {
+    throw new Error("DEMO_SELLER_PASSWORD가 필요해요 — scripts/.env에 채워주세요.");
+  }
+  const seller = buildDemoSeller(password);
+  const buyers = buildDemoBuyers(password);
   const ids = {};
-  for (const acc of ALL_DEMO_ACCOUNTS) {
+  for (const acc of [seller, ...Object.values(buyers)]) {
     const { data, error } = await admin.auth.admin.createUser({
       email: acc.email,
       password: acc.password,

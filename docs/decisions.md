@@ -82,3 +82,8 @@
 - **iOS 아이콘(Icon Composer 번들)은 건드리지 않았다**: Apple의 새 Icon Composer 포맷(`assets/expo.icon/icon.json`)은 멀티레이어·그라디언트·그룹을 가진 전용 포맷이라 원시 JSON을 손으로 잘못 만들면 깨진 채로 제출될 위험이 있고, PROJECT.md 자체가 "iOS는 후속"이라고 못 박아뒀다 — Android 우선순위와 위험 회피가 같은 방향이라 그대로 뒀다.
 - **`expo start --web`으로 실제 화면을 캡처하려다 런타임 에러(NativeWind/react-native-web 비호환)를 만났고, 그 자리에서 고치지 않기로 했다**: 원인 조사가 이 스테이지의 목적(출시 자산 준비)을 벗어나는 별도 디버깅 작업이 될 게 분명했고, 웹 타깃은 지금 출시 우선순위(Android)와 무관하다. 대신 실제 컴포넌트 코드에서 색상·문구를 그대로 옮긴 목업으로 대체하고, 모든 파일명·문서에 "목업, 실기기 캡처 아님"을 반복해서 명시했다 — 스토어 제출 전 진짜 스크린샷으로 바꿔야 한다는 사실이 묻히지 않게.
 - **README의 "RLS 버그 2건"은 3단계 차단 기능에서 실제로 찾은 두 인스턴스(같은 근본 원인의 두 번째 레이어)를 썼다**: 다른 후보(§3 accept_application의 NULL-safe 비교, is_withdraw_restricted 설계)는 Phase 1에서 사전에 예방된 것이지 "찾은 버그"가 아니라서 제외했다 — 포트폴리오 서사는 실제로 겪은 디버깅만 담는 게 정직하다고 판단했다.
+
+## 데모 데이터 정리 + 비밀번호 노출 대응 (2026-09-30)
+- **데모 계정 비밀번호를 `scripts/lib/demo-data.mjs`에 리터럴로 넣었다가 공개 저장소에 그대로 커밋·푸시했다**: `git grep`으로 확인해서야 발견했다 — `docs/phone-check.md`에도 안내 목적으로 두 번 더 적어 총 세 곳에 평문으로 남아 있었다. 저장소가 public이라(GitHub API로 확인) 그 순간부터 사실상 공개된 값이었다.
+- **git 히스토리를 rewrite하는 대신 비밀번호를 회전하는 쪽을 택했다**: 이미 push된 커밋의 히스토리를 고치려면 force-push가 필요하고, 데모 계정 4개는 전부 dev DB의 재생성 가능한 데이터라 "과거에 유출된 값이 더는 유효하지 않게" 만드는 게 "과거 기록 자체를 지우는" 것보다 비용 대비 효과가 높다고 판단했다 — `pnpm cleanup:demo`로 계정을 지우고 `pnpm seed:demo`로 새 비밀번호로 재생성해서 이전 값은 이미 무력화됐다.
+- **비밀번호를 코드에서 완전히 빼고 `scripts/.env`의 `DEMO_SELLER_PASSWORD`로만 주입하게 바꿨다**: `scripts/lib/demo-data.mjs`는 계정 정의를 `buildDemoSeller(password)`/`buildDemoBuyers(password)` 함수로 바꿔 비밀번호를 인자로만 받고, `docs/phone-check.md`는 값 대신 "`scripts/.env`의 `DEMO_SELLER_PASSWORD` 참고"라고만 적어 다음에 다시 같은 실수를 반복할 표면을 줄였다.
