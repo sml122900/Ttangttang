@@ -10,6 +10,11 @@
 
 > 시연: <!-- TODO: 랜딩 페이지 시연 GIF — apps/web/app/page.tsx에 삽입 예정 (docs/store-listing.md 6단계 항목) -->
 
+**현재 상태**: 개발 중이다. 웹(랜딩·약관·결제 콜백)은 배포돼 있지만, 앱은 아직 스토어에
+없고 비공개 테스트도 시작 전이라 실사용자가 없다. 결제는 Toss 테스트 키로만 검증했고 —
+실카드 승인은 [`docs/phone-check.md`](./docs/phone-check.md)의 실기기 확인이 남아 있다.
+스토어 심사 전 남은 작업은 [`docs/launch-audit.md`](./docs/launch-audit.md) 진행 표를 보면 된다.
+
 ---
 
 ## 문제 정의
@@ -74,7 +79,33 @@ v1은 "구매자들의 결제 경쟁"이 임계 구간이라 락 선점 같은 �
 재현해 검증한다 — 실카드 없이. 상세: [`docs/launch-audit.md`](./docs/launch-audit.md) §4,
 [`docs/decisions.md`](./docs/decisions.md) 1단계.
 
-## RLS 버그 2건
+## 권한 버그, 네 번 찾다
+
+이 프로젝트에서 반복적으로 마주친 패턴이 있다 — "겉으로는 막힌 것 같은데 실제로는 뚫려있는"
+권한 버그. 시기별로 네 번 찾았다.
+
+**Phase 1 — 함수 권한 감사(초기 개발)**: 결제·낙찰을 확정하는 함수 두 개에서 미리 막았다.
+1. `finalize_accepted_application()`/`revert_failed_acceptance()`는 Supabase 신규 함수의
+   기본값(스키마 기본 권한으로 `anon`/`authenticated`에도 EXECUTE가 열림)이 그대로면,
+   클라이언트가 가짜 `toss_payment_key`로 이 함수를 직접 호출해 **결제 없이 낙찰을 완료
+   처리**할 수 있었다. `revoke ... from public, anon, authenticated`로 명시적으로 걷어냈다
+   (`supabase/migrations/20260703084625_accept_atomicity.sql`).
+2. `accept_application()`의 "판매자 본인 확인"에 흔한 부등호(`<>`)를 썼다면, `auth.uid()`가
+   NULL인 익명 호출에서 그 비교 자체가 NULL이 되어 `IF`문이 통째로 스킵됐을 것이다 — 아무나
+   아무 지원서나 수락할 수 있는 구멍. `IS DISTINCT FROM`(NULL-안전 비교)으로 막아뒀다.
+
+**2026-09-27 — 출시 감사 → 1단계 보강**: 결제 체인의 보상 처리가 비어 있던 것(P1/P2/P5) —
+위 "수락 원자성과 보상 트랜잭션" 참고.
+
+**2026-09-28 — 3단계(신고·차단)**: RLS 서브쿼리가 caller의 RLS를 그대로 상속받는 버그 2건
+(아래 상세).
+
+**2026-09-29 — 4단계(수령 확인)**: `item_status` enum에 `completed` 값이 있는데 그 값으로
+전이시키는 코드가 어디에도 없어, 거래가 끝나도 매물이 영원히 `awarded`로 남아 있었다.
+`confirm_pickup()`이 트랜잭션을 완료 처리하는 바로 그 순간에 같이 고쳤다
+(`supabase/migrations/20260929000700_items_completed_on_pickup.sql`).
+
+### RLS 버그 2건 (3단계 상세)
 
 3단계(신고·차단)에서 "차단하면 서로의 매물이 안 보인다"는 상호 비노출을 구현하다가, 같은
 근본 원인의 버그를 두 번 마주쳤다.
@@ -180,10 +211,13 @@ DB가 직접 외부 HTTP를 호출하는 두 지점(Discord 릴레이, Expo 푸�
 끝에 정리한다.
 
 ```
-pnpm e2e             # 등록→지원→수락(결제 4경로: 성공/거절/예외/타임아웃)→messages RLS
-pnpm verify:stage3   # 계정 삭제(소프트 삭제)·신고·차단(상호 비노출)
-pnpm verify:stage4   # 수령확인·노쇼정산·수령률·알림·AI 어시스트(실 API, 이상한 사진 3종 포함)
+pnpm e2e             # 30개 스텝 — 등록→지원→수락(결제 4경로: 성공/거절/예외/타임아웃)→messages RLS
+pnpm verify:stage3   # 20개 스텝 — 계정 삭제(소프트 삭제)·신고·차단(상호 비노출)
+pnpm verify:stage4   # 33개 스텝 — 수령확인·노쇼정산·수령률·알림·AI 어시스트(실 API, 이상한 사진 3종 포함)
 ```
+
+(2026-09-30 기준 통과 수. 세 스크립트 다 매번 새 throwaway 계정으로 돌고 끝에 만든 데이터를
+정리한다 — 코드가 바뀌면 스텝 수도 바뀔 수 있다.)
 
 ## 화면 명세, 진행 상황
 
